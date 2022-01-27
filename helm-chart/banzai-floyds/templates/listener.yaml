@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "banzai-floyds.fullname" . }} -listener
+  labels:
+{{ include "banzai-floyds.labels" . | indent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "banzai-floyds.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "banzai-floyds.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+    {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: 'banzai-floyds-listener'
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - "banzai_floyds_run_realtime_pipeline"
+            - "--post-to-archive"
+            - "--post-to-elasticsearch"
+            - "--fpack"
+            - "--rlevel=91"
+            - "--db-address=$(DB_ADDRESS)"
+            - "--broker-url=$(FITS_BROKER)"
+            - "--queue-name=$(QUEUE_NAME)"
+            - "--no-file-cache"
+          env:
+            {{- include "banzaiFloyds.Env" . | nindent 12}}
+          resources:
+            requests:
+              cpu: "0.1"
+              memory: "128M"
+              limits:
+                cpu: "1"
+                memory: "1Gi"
+            volumeMounts:
+              - name: listener-tmp
+                mountPath: /tmp
+                readOnly: false
+      volumes:
+        - name: listener-tmp
+          emptyDir:
+            sizeLimit: 1Gi
+
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}

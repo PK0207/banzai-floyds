@@ -2,13 +2,19 @@ import pytest
 import time
 import logging
 from banzai.celery import app
-from banzai.utils import file_utils
+from banzai.tests.utils import FakeResponse
+import banzai.dbs
+import os
+import pkg_resources
+from kombu import Connection, Exchange
+from astropy.io import ascii
 
 logger = logging.getLogger('banzai')
 
 app.conf.update(CELERY_TASK_ALWAYS_EAGER=True)
 
-DATA_FILELIST = pkg_resources.resource_filename(TEST_PACKAGE, 'data/configdb_example.json')
+DATA_FILELIST = pkg_resources.resource_filename('banzai_floyds.tests', 'data/test_data.dat')
+CONFIGDB_FILENAME = pkg_resources.resource_filename('banzai_floyds.tests', 'data/configdb.json')
 
 
 def celery_join():
@@ -36,40 +42,36 @@ def celery_join():
 # Note this is complicated by the fact that things are running as celery tasks.
 @pytest.mark.e2e
 @pytest.fixture(scope='module')
-@mock.patch('banzai.main.argparse.ArgumentParser.parse_args')
-@mock.patch('banzai.main.file_utils.post_to_ingester', return_value={'frameid': None})
 @mock.patch('banzai.dbs.requests.get', return_value=FakeResponse(CONFIGDB_FILENAME))
-def init(configdb, mock_ingester, mock_args):
-    os.system(f'banzai_create_db --db-address={os.environ["DB_ADDRESS"]}')
-    populate_instrument_tables(db_address=os.environ["DB_ADDRESS"], configdb_address='http://fakeconfigdb')
-    for instrument in INSTRUMENTS:
-        for bpm_filepath in glob(os.path.join(DATA_ROOT, instrument, 'bpm/*bpm*')):
-            mock_args.return_value = argparse.Namespace(filepath=bpm_filepath, db_address=os.environ['DB_ADDRESS'],
-                                                        log_level='debug')
-            add_bpm()
+def init(configdb, mock_args):
+    banzai.dbs.create_db(os.environ["DB_ADDRESS"])
+    banzai.dbs.populate_instrument_tables(db_address=os.environ["DB_ADDRESS"], configdb_address='http://fakeconfigdb')
+
 
 @pytest.mark.e2e
 @pytest.mark.science_frames
 class TestScienceFileCreation:
     @pytest.fixture(autouse=True)
     def process_science_frames(self, init):
-        logger.info('Reducing individual frames for filenames: {filenames}'.format(filenames=raw_filenames))
-        for day_obs in DAYS_OBS:
-            raw_path = os.path.join(DATA_ROOT, day_obs, 'raw')
-            for filename in glob(os.path.join(raw_path, raw_filenames)):
-                file_utils.post_to_archive_queue(filename, os.getenv('FITS_BROKER'),
-                                                 exchange_name=os.getenv('FITS_EXCHANGE'))
+        logger.info('Reducing individual frames')
+
+        exchange = Exchange(os.getenv('FITS_EXCHANGE', 'fits_files'), type='fanout')
+        test_data = ascii.load(DATA_FILELIST)
+        with Connection(os.getenv('FITS_BROKER')) as conn:
+            producer = conn.Producer(exchange=exchange)
+            for row in test_data:
+                producer.publish({'filename': row['filename'], 'frameid': row['frameid']})
+            producer.release()
+
         celery_join()
-        logger.info('Finished reducing individual frames for filenames: {filenames}'.format(filenames=raw_filenames))
+        logger.info('Finished reducing individual frames')
 
     def test_if_science_frames_were_created(self):
-        expected_files = []
-        created_files = []
-        for day_obs in DAYS_OBS:
-            expected_files += [os.path.basename(filename).replace('e00', 'e91')
-                               for filename in glob(os.path.join(DATA_ROOT, day_obs, 'raw', '*e00*'))]
-            created_files += [os.path.basename(filename) for filename in glob(os.path.join(DATA_ROOT, day_obs,
-                                                                                           'processed', '*e91*'))]
-        assert len(expected_files) > 0
-        for expected_file in expected_files:
-            assert expected_file in created_files
+        test_data = ascii.load(DATA_FILELIST)
+        for row in test_data:
+            site = row['filename'][:3]
+            camera = row['filename'].split('-')[1]
+            dayobs = row['filename'].split('-')[2]
+            expected_file = os.path.join('/archive', 'engineering', site, camera, dayobs, 'processed',
+                                         row['filename'].replace('00.fits', '91.fits'))
+            assert os.path.exists(expected_file)

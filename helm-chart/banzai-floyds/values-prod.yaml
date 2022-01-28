@@ -70,3 +70,17 @@ banzai:
 
 instrumentTableCronjob:
   schedule: "*/5 * * * *"
+
+useDockerizedDatabase: false
+useDockerizedRabbitMQ: false
+
+postgresql:
+  hostname:  postgres1-cluster.cluster-cple9sjsskrf.us-west-2.rds.amazonaws.com
+  postgresqlUsername: banzai-floyds
+  postgresqlDatabase: banzai-floyds
+
+rabbitmq:
+  hostname: rabbitmq-ha.prod.svc.cluster.local.
+  rabbitmq:
+    username: banzai-floyds
+  vhost: banzai-floyds

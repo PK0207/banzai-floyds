@@ -44,6 +44,31 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 
+{{/*
+Generate the PostgreSQL DB hostname
+*/}}
+{{- define "banzai-floyds.dbhost" -}}
+{{- if .Values.postgresql.fullnameOverride -}}
+{{- .Values.postgresql.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- else if .Values.useDockerizedDatabase -}}
+{{- printf "%s-postgresql" .Release.Name -}}
+{{- else -}}
+{{- required "`postgresql.hostname` must be set when `useDockerizedDatabase` is `false`" .Values.postgresql.hostname -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Generate the RabbitMQ queue hostname
+*/}}
+{{- define "banzai-floyds.rabbitmq" -}}
+{{- if .Values.rabbitmq.fullnameOverride -}}
+{{- .Values.rabbitmq.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- else if .Values.useDockerizedRabbitMQ -}}
+{{- printf "%s-rabbitmq" .Release.Name -}}
+{{- else -}}
+{{- required "`rabbitmq.hostname` must be set when `useDockerizedRabbitMQ` is `false`" .Values.rabbitmq.hostname -}}
+{{- end -}}
+{{- end -}}
 
 {{/*
 Define shared environment variables
@@ -111,7 +136,7 @@ Optional raw data source environment variables
 BANZAI DB Configuration
 */}}
 - name: DB_HOST
-  value: {{ include "banzai.dbhost" . | quote }}
+  value: {{ include "banzai-floyds.dbhost" . | quote }}
 - name: DB_PASSWORD
   valueFrom:
     secretKeyRef:
@@ -127,7 +152,7 @@ BANZAI DB Configuration
 Celery task queue configuration
 */ -}}
 - name: RABBITMQ_HOST
-  value: {{ include "banzai.rabbitmq" . | quote }}
+  value: {{ include "banzai-floyds.rabbitmq" . | quote }}
 - name: RABBITMQ_PASSWORD
   valueFrom:
     secretKeyRef:

@@ -57,7 +57,7 @@ class TestScienceFileCreation:
         logger.info('Reducing individual frames')
 
         exchange = Exchange(os.getenv('FITS_EXCHANGE', 'fits_files'), type='fanout')
-        test_data = ascii.load(DATA_FILELIST)
+        test_data = ascii.read(DATA_FILELIST)
         with Connection(os.getenv('FITS_BROKER')) as conn:
             producer = conn.Producer(exchange=exchange)
             for row in test_data:
@@ -68,7 +68,7 @@ class TestScienceFileCreation:
         logger.info('Finished reducing individual frames')
 
     def test_if_science_frames_were_created(self):
-        test_data = ascii.load(DATA_FILELIST)
+        test_data = ascii.read(DATA_FILELIST)
         for row in test_data:
             site = row['filename'][:3]
             camera = row['filename'].split('-')[1]

@@ -8,6 +8,7 @@ import os
 import pkg_resources
 from kombu import Connection, Exchange
 from astropy.io import ascii
+import mock
 
 logger = logging.getLogger('banzai')
 

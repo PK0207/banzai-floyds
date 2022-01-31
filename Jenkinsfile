@@ -63,6 +63,10 @@ pipeline {
 		    }
 		}
 		stage('Test-Science-Frame-Creation') {
+			environment {
+				// store stage start time in the environment so it has stage scope
+				START_TIME = sh(script: 'date +%s', returnStdout: true).trim()
+			}
 			when {
 				anyOf {
 					branch 'PR-*'
@@ -82,6 +86,8 @@ pipeline {
 				always {
 					script {
 					    withKubeConfig([credentialsId: "build-kube-config"]) {
+					    	env.LOGS_SINCE = sh(script: 'expr `date +%s` - ${START_TIME}', returnStdout: true).trim()
+    					    sh('kubectl --kubeconfig=${KUBERNETES_CREDS} -n dev logs --since=${LOGS_SINCE}s --all-containers banzai-e2e-test')
 						    sh("kubectl cp -c banzai-floyds-e2e-listener ${podName}:/home/archive/pytest-science-frames.xml " +
 						            "pytest-science-frames.xml")
 						    junit "pytest-science-frames.xml"

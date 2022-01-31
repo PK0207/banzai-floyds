@@ -2,7 +2,7 @@
 @Library('lco-shared-libs@0.1.3') _
 
 pipeline {
-	agent any
+    agent any
 	parameters {
 		booleanParam(
 			name: 'forceEndToEnd',
@@ -20,7 +20,6 @@ pipeline {
 		lock resource: 'BANZAIFLOYDSLock'
 	}
 	stages {
-		stages {
 		stage('Build image') {
 			steps {
 				script {

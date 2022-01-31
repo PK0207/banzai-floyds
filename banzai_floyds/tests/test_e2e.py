@@ -44,7 +44,7 @@ def celery_join():
 @pytest.mark.e2e
 @pytest.fixture(scope='module')
 @mock.patch('banzai.dbs.requests.get', return_value=FakeResponse(CONFIGDB_FILENAME))
-def init(configdb, mock_args):
+def init(mock_configdb):
     banzai.dbs.create_db(os.environ["DB_ADDRESS"])
     banzai.dbs.populate_instrument_tables(db_address=os.environ["DB_ADDRESS"], configdb_address='http://fakeconfigdb')
 

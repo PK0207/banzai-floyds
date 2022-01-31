@@ -61,7 +61,7 @@ class TestScienceFileCreation:
         with Connection(os.getenv('FITS_BROKER')) as conn:
             producer = conn.Producer(exchange=exchange)
             for row in test_data:
-                producer.publish({'filename': row['filename'], 'frameid': row['frameid']})
+                producer.publish({'filename': row['filename'], 'frameid': str(row['frameid'])})
             producer.release()
 
         celery_join()

@@ -1,7 +1,11 @@
 #!/usr/bin/env groovy
 @Library('lco-shared-libs@0.1.3') _
 
-helmPipeline()
+final params = [
+    helmChartPath: "helm-chart/banzai-floyds-e2e"
+    ]
+
+helmPipeline(params)
 
 pipeline {
 	agent any

@@ -1,4 +1,5 @@
-from banzai.settings import *
+from banzai.settings import *  # noqa: E401,E403
+
 ORDERED_STAGES = [
                   'banzai.bias.OverscanSubtractor',
                   ]

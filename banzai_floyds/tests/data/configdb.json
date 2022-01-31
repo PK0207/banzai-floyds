@@ -1,12 +1,3 @@
-Site List
-
-Site List
-GET /sites/
-HTTP 200 OK
-Allow: GET, POST, HEAD, OPTIONS
-Content-Type: application/json
-Vary: Accept
-
 {
     "count": 15,
     "next": null,

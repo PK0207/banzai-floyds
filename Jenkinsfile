@@ -12,7 +12,7 @@ pipeline {
 	environment {
 		dockerImage = null
 		PROJ_NAME = projName()
-		GIT_DESCRIPTION = TAG_NAME != null ? TAG_NAME : GIT_COMMIT[0..11]
+		GIT_DESCRIPTION = sh(script: 'git describe', returnStdout: true).trim()
 		DOCKER_IMG = dockerImageName("${LCO_DOCK_REG}", "${PROJ_NAME}", "${GIT_DESCRIPTION}")
 	}
 	options {

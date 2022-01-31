@@ -1,12 +1,6 @@
 #!/usr/bin/env groovy
 @Library('lco-shared-libs@0.1.3') _
 
-final params = [
-    helmChartPath: "helm-chart/banzai-floyds-e2e"
-    ]
-
-helmPipeline(params)
-
 pipeline {
 	agent any
 	parameters {
@@ -16,13 +10,31 @@ pipeline {
 			description: 'When true, forces the end-to-end tests to always run.')
 	}
 	environment {
-		GIT_DESCRIPTION = gitDescribe()
+		dockerImage = null
+		PROJ_NAME = projName()
+		GIT_DESCRIPTION = gitDescription()
+		DOCKER_IMG = dockerImageName("${LCO_DOCK_REG}", "${PROJ_NAME}", "${GIT_DESCRIPTION}")
 	}
 	options {
 		timeout(time: 8, unit: 'HOURS')
 		lock resource: 'BANZAIFLOYDSLock'
 	}
 	stages {
+		stages {
+		stage('Build image') {
+			steps {
+				script {
+					dockerImage = docker.build("${DOCKER_IMG}", "--pull .")
+				}
+			}
+		}
+		stage('Push image') {
+			steps {
+				script {
+					dockerImage.push("${GIT_DESCRIPTION}")
+				}
+			}
+		}
 		stage('DeployTestStack') {
 			when {
 				anyOf {

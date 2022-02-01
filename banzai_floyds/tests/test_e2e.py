@@ -9,6 +9,7 @@ import pkg_resources
 from kombu import Connection, Exchange
 from astropy.io import ascii
 import mock
+import requests
 
 logger = logging.getLogger('banzai')
 
@@ -61,7 +62,9 @@ class TestScienceFileCreation:
         with Connection(os.getenv('FITS_BROKER')) as conn:
             producer = conn.Producer(exchange=exchange)
             for row in test_data:
-                producer.publish({'filename': row['filename'], 'frameid': str(row['frameid'])})
+                archive_record = requests.get(f'{os.getenv("API_ROOT")}frames/{row["frameid"]}').json()
+                archive_record['frameid'] = archive_record['id']
+                producer.publish(archive_record)
             producer.release()
 
         celery_join()

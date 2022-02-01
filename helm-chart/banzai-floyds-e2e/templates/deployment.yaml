@@ -73,6 +73,8 @@ spec:
               value: "1"
             - name: CELERY_TASK_QUEUE_NAME
               value: "e2e_task_queue"
+            - name: API_ROOT
+              value: "https://archive-api.lco.global/"
           command:
             - celery
             - -A
@@ -116,6 +118,8 @@ spec:
               value: "1"
             - name: CELERY_TASK_QUEUE_NAME
               value: "e2e_task_queue"
+            - name: API_ROOT
+              value: "https://archive-api.lco.global/"
           command:
             - banzai_floyds_run_realtime_pipeline
             - "--db-address=sqlite:////archive/engineering/test.db"

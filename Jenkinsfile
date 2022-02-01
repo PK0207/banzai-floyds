@@ -87,7 +87,7 @@ pipeline {
 					script {
 					    withKubeConfig([credentialsId: "build-kube-config"]) {
 					    	env.LOGS_SINCE = sh(script: 'expr `date +%s` - ${START_TIME}', returnStdout: true).trim()
-    					    sh('kubectl --kubeconfig=${KUBERNETES_CREDS} -n dev logs --since=${LOGS_SINCE}s --all-containers banzai-floyds-e2e')
+    					    sh("kubectl logs ${podName} --since=${LOGS_SINCE}s --all-containers")
 						    sh("kubectl cp -c banzai-floyds-e2e-listener ${podName}:/home/archive/pytest-science-frames.xml " +
 						            "pytest-science-frames.xml")
 						    junit "pytest-science-frames.xml"

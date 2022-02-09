@@ -1,0 +1,5 @@
+This chart deploys the BANZAI-floyds pipeline for end-to-end testing.
+
+See https://github.com/lcogt/banzai-floyds for the code and documentation.
+
+Contact Curtis McCully (cmccully@lco.global) with issues.

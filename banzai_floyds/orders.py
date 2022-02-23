@@ -107,7 +107,8 @@ class OrderSolver(Stage):
                                                 image.data.shape[1] // 2 + self.CENTER_CUT_WIDTH // 2 + 1, 1)
             order_centers = estimate_order_centers(image.data[center_section], image.uncertainty[center_section],
                                                    order_width=self.ORDER_WIDTH)
-            initial_guesses = [(center,) + tuple(0 for _ in range(1, self.POLYNOMIAL_ORDER + 1)) for center in order_centers]
+            initial_guesses = [(center,) + tuple(0 for _ in range(1, self.POLYNOMIAL_ORDER + 1))
+                               for center in order_centers]
         else:
             # Load from previous solve
             initial_guesses = image.orders.coeffs

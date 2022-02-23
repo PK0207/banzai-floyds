@@ -42,6 +42,7 @@ def test_fit_orders():
 
 
 def test_order_solver_stage():
+    np.random.seed(19231442)
     data = np.zeros((516, 503))
     error = np.ones((516, 503))
     order_centers = 145, 371

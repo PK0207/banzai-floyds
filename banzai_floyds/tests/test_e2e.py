@@ -7,9 +7,15 @@ import banzai.dbs
 import os
 import pkg_resources
 from kombu import Connection, Exchange
-from astropy.io import ascii
 import mock
 import requests
+from astropy.io import fits, ascii
+import numpy as np
+from banzai.utils.fits_utils import download_from_s3
+import banzai.main
+from banzai_floyds import settings
+from banzai.utils import file_utils
+
 
 logger = logging.getLogger('banzai')
 
@@ -51,10 +57,40 @@ def init(mock_configdb):
 
 
 @pytest.mark.e2e
+@pytest.mark.detect_orders
+class TestOrderDetection:
+    @pytest.fixture(autouse=True)
+    def process_skyflat(self, init):
+        # Pull down our experimental skyflat
+        skyflat_info = ascii.read(pkg_resources.resource_filename('banzai_floyds.tests', 'data/test_skyflat.dat'))[0]
+
+        context = banzai.main.parse_args(settings, parse_system_args=False)
+        skyflat_hdu = fits.open(download_from_s3(skyflat_info, context))
+
+        # Munge the data to be OBSTYPE SKYFLAT
+        skyflat_hdu['SCI'].header['OBSTYPE'] = 'SKYFLAT'
+        skyflat_name = skyflat_info["filename"].replace("x00.fits", "f00.fits")
+        skyflat_hdu.writeto(f'{skyflat_name}')
+        # Process the data
+        filename = os.path.join(os.getcwd(), skyflat_name)
+        file_utils.post_to_archive_queue(filename, os.getenv('FITS_BROKER'),
+                                         exchange_name=os.getenv('FITS_EXCHANGE'))
+
+        celery_join()
+
+    def test_that_order_mask_exists(self):
+        expected_file = os.path.join()
+        assert os.path.exists(expected_file)
+        hdu = fits.open(expected_file)
+        assert 'ORDERS' in hdu
+        # Note there are only two orders in floyds
+        assert np.max(hdu['ORDERS'].data) == 2
+
+
+@pytest.mark.e2e
 @pytest.mark.science_frames
 class TestScienceFileCreation:
-    @pytest.fixture(autouse=True)
-    def process_science_frames(self, init):
+    def process_science_frames(self):
         logger.info('Reducing individual frames')
 
         exchange = Exchange(os.getenv('FITS_EXCHANGE', 'fits_files'), type='fanout')

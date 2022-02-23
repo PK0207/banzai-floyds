@@ -78,7 +78,7 @@ pipeline {
                     withKubeConfig([credentialsId: "build-kube-config"]) {
 						sh("kubectl exec ${podName} -c banzai-floyds-e2e-listener -- " +
 						        "pytest -s --durations=0 --junitxml=/home/archive/pytest-order-detection.xml " +
-						        "-m order_detection /lco/banzai-floyds/")
+						        "-m detect_orders /lco/banzai-floyds/")
 					}
 				}
 			}

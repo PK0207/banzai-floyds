@@ -63,7 +63,7 @@ class TestOrderDetection:
     def process_skyflat(self, init):
         # Pull down our experimental skyflat
         skyflat_info = ascii.read(pkg_resources.resource_filename('banzai_floyds.tests', 'data/test_skyflat.dat'))[0]
-
+        skyflat_info = dict(skyflat_info)
         context = banzai.main.parse_args(settings, parse_system_args=False)
         skyflat_hdu = fits.open(download_from_s3(skyflat_info, context))
 

@@ -136,4 +136,6 @@ class OrderSolver(Stage):
 
         image.add_or_update(DataTable(coeff_table, name='ORDER_COEFFS',
                                       meta=fits.Header({'WIDTH': self.ORDER_WIDTH, 'POLYORD': self.POLYNOMIAL_ORDER})))
+        image.is_master = True
+
         return image

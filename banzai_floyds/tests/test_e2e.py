@@ -84,6 +84,7 @@ class TestOrderDetection:
         skyflat_name = skyflat_info["filename"].replace("x00.fits", "f00.fits")
         filename = os.path.join('/archive', 'engineering', f'{skyflat_name}')
         skyflat_hdu.writeto(filename)
+        skyflat_hdu.close()
         # Process the data
         file_utils.post_to_archive_queue(filename, os.getenv('FITS_BROKER'),
                                          exchange_name=os.getenv('FITS_EXCHANGE'))
@@ -106,6 +107,7 @@ class TestOrderDetection:
 @pytest.mark.e2e
 @pytest.mark.science_frames
 class TestScienceFileCreation:
+    @pytest.fixture(autouse=True)
     def process_science_frames(self):
         logger.info('Reducing individual frames')
 

@@ -46,6 +46,17 @@ def celery_join():
         if all(queue is None or len(queue['celery@banzai-celery-worker']) == 0 for queue in queues):
             break
 
+def expected_filenames(file_table):
+    filenames = []
+    for row in file_table:
+        site = row['filename'][:3]
+        camera = row['filename'].split('-')[1]
+        dayobs = row['filename'].split('-')[2]
+        expected_file = os.path.join('/archive', 'engineering', site, camera, dayobs, 'processed',
+                                     row['filename'].replace('00.fits', '91.fits'))
+        filenames.append(expected_file)
+    return filenames
+
 
 # Note this is complicated by the fact that things are running as celery tasks.
 @pytest.mark.e2e
@@ -79,12 +90,14 @@ class TestOrderDetection:
         celery_join()
 
     def test_that_order_mask_exists(self):
-        expected_file = os.path.join()
-        assert os.path.exists(expected_file)
-        hdu = fits.open(expected_file)
-        assert 'ORDERS' in hdu
-        # Note there are only two orders in floyds
-        assert np.max(hdu['ORDERS'].data) == 2
+        test_data = ascii.read(pkg_resources.resource_filename('banzai_floyds.tests', 'data/test_skyflat.dat'))
+        filenames = expected_filenames(test_data)
+        for expected_file in filenames:
+            assert os.path.exists(expected_file)
+            hdu = fits.open(expected_file)
+            assert 'ORDERS' in hdu
+            # Note there are only two orders in floyds
+            assert np.max(hdu['ORDERS'].data) == 2
 
 
 @pytest.mark.e2e
@@ -108,10 +121,5 @@ class TestScienceFileCreation:
 
     def test_if_science_frames_were_created(self):
         test_data = ascii.read(DATA_FILELIST)
-        for row in test_data:
-            site = row['filename'][:3]
-            camera = row['filename'].split('-')[1]
-            dayobs = row['filename'].split('-')[2]
-            expected_file = os.path.join('/archive', 'engineering', site, camera, dayobs, 'processed',
-                                         row['filename'].replace('00.fits', '91.fits'))
+        for expected_file in expected_filenames(test_data):
             assert os.path.exists(expected_file)

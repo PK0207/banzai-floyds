@@ -81,9 +81,9 @@ class TestOrderDetection:
         # Munge the data to be OBSTYPE SKYFLAT
         skyflat_hdu['SCI'].header['OBSTYPE'] = 'SKYFLAT'
         skyflat_name = skyflat_info["filename"].replace("x00.fits", "f00.fits")
-        skyflat_hdu.writeto(f'{skyflat_name}')
+        filename =os.path.join('/archive', 'engineering', f'{skyflat_name}')
+        skyflat_hdu.writeto(filename)
         # Process the data
-        filename = os.path.join(os.getcwd(), skyflat_name)
         file_utils.post_to_archive_queue(filename, os.getenv('FITS_BROKER'),
                                          exchange_name=os.getenv('FITS_EXCHANGE'))
 

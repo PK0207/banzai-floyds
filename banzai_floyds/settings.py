@@ -10,7 +10,7 @@ FRAME_SELECTION_CRITERIA = [('type', 'contains', 'FLOYDS')]
 
 SUPPORTED_FRAME_TYPES = ['SPECTRUM', 'LAMPFLAT', 'ARC', 'SKYFLAT']
 
-LAST_STAGE = {'SPECTRUM': None, 'LAMPFLAT': None, 'ARC': None}
+LAST_STAGE = {'SPECTRUM': None, 'LAMPFLAT': None, 'ARC': None, 'SKYFLAT': None}
 
 EXTRA_STAGES = {'SPECTRUM': None, 'LAMPFLAT': None, 'ARC': None, 'SKYFLAT': ['banzai_floyds.traces.OrderSolver']}
 

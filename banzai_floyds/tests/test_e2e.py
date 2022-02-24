@@ -46,6 +46,7 @@ def celery_join():
         if all(queue is None or len(queue['celery@banzai-celery-worker']) == 0 for queue in queues):
             break
 
+
 def expected_filenames(file_table):
     filenames = []
     for row in file_table:
@@ -81,7 +82,7 @@ class TestOrderDetection:
         # Munge the data to be OBSTYPE SKYFLAT
         skyflat_hdu['SCI'].header['OBSTYPE'] = 'SKYFLAT'
         skyflat_name = skyflat_info["filename"].replace("x00.fits", "f00.fits")
-        filename =os.path.join('/archive', 'engineering', f'{skyflat_name}')
+        filename = os.path.join('/archive', 'engineering', f'{skyflat_name}')
         skyflat_hdu.writeto(filename)
         # Process the data
         file_utils.post_to_archive_queue(filename, os.getenv('FITS_BROKER'),

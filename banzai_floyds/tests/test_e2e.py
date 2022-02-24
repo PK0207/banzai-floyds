@@ -92,6 +92,8 @@ class TestOrderDetection:
 
     def test_that_order_mask_exists(self):
         test_data = ascii.read(pkg_resources.resource_filename('banzai_floyds.tests', 'data/test_skyflat.dat'))
+        for row in test_data:
+            row['filename'] = row['filename'].replace("x00.fits", "f00.fits")
         filenames = expected_filenames(test_data)
         for expected_file in filenames:
             assert os.path.exists(expected_file)

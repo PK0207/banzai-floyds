@@ -67,6 +67,9 @@ def evaluate_order_model(theta, data, error, order_width):
     # Convert the model into a boolean region array
     order_mask = order_region(order_width, model, data.shape)
 
+    # TODO: Implement a smoothed filter so the edges aren't so sharp. Use two logistic functions for each of the edges
+    # Note the normalization will need a square of the weights / sigma^2. This is due to combining uncertainty
+    # propagation for a weighted sum w^2 sigma^2 (the w = P / sigma^2 so one pair of the sigmas cancel)
     # Evaluate the metric
     return tophat_filter_metric(data, error, order_mask)
 
@@ -81,9 +84,15 @@ def fit_order_curve(data, error, order_width, initial_guess):
 
 
 class OrderLoader(CalibrationUser):
+    def on_missing_master_calibration(self, image):
+        if image.obstype == 'SKYFLAT':
+            return image
+        else:
+            return super(OrderLoader, self).on_missing_master_calibration(image)
+
     @property
     def calibration_type(self):
-        return 'ORDERS'
+        return 'SKYFLAT'
 
     def apply_master_calibration(self, image, master_calibration_image):
         image.orders = master_calibration_image.orders

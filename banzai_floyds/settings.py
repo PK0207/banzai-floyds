@@ -12,6 +12,6 @@ SUPPORTED_FRAME_TYPES = ['SPECTRUM', 'LAMPFLAT', 'ARC', 'SKYFLAT']
 
 LAST_STAGE = {'SPECTRUM': None, 'LAMPFLAT': None, 'ARC': None, 'SKYFLAT': None}
 
-EXTRA_STAGES = {'SPECTRUM': None, 'LAMPFLAT': None, 'ARC': None, 'SKYFLAT': ['banzai_floyds.traces.OrderSolver']}
+EXTRA_STAGES = {'SPECTRUM': None, 'LAMPFLAT': None, 'ARC': None, 'SKYFLAT': ['banzai_floyds.orders.OrderSolver']}
 
 FRAME_FACTORY = 'banzai_floyds.frames.FLOYDSFrameFactory'

@@ -27,10 +27,34 @@ class Orders:
         return [model.coef for model in self._models]
 
 
+def logistic(x, x0=0, k=1):
+    return 1.0 / (1.0 + np.exp(-2 * k * (x - x0)))
+
+
 def tophat_filter_metric(data, error, region):
     # This is adapted from Zackay et al. 2017
     metric = (data[region] / error[region] / error[region]).sum()
     metric /= ((1.0 / error[region] / error[region]).sum()) ** 0.5
+    return metric
+
+
+def smooth_order_metric(model, data, error, width):
+    x = np.arange(data.shape[1])
+    y_centers = model(x)
+    x2d, y2d = np.meshgrid(x, np.arange(data.shape[0]))
+    centered_coordinates = y2d - y_centers
+
+    # This is adapted from Zackay et al. 2017
+    # We Implement a smoothed filter so the edges aren't so sharp. Use two logistic functions for each of the edges
+    # Note the normalization will need a square of the weights / sigma^2. This is due to combining uncertainty
+    # propagation for a weighted sum w^2 sigma^2 (the w = filter / sigma^2 so one pair of the sigmas cancel)
+    # Note the minus sign for the top of the filter. This flips the logistic function. This means that x0 also has to
+    # flip signs. We also have to add a half to each side of the filter so that the edges are at the edges of pixels
+    # as the center of the pixels are the integer coordinates
+    weights = logistic(centered_coordinates, x0=-(width // 2 + 0.5), k=2) * logistic(-centered_coordinates, x0=-(width // 2 + 0.5), k=2)
+    # Evaluate the metric
+    metric = (data * weights / error / error).sum()
+    metric /= ((weights * weights / error / error).sum()) ** 0.5
     return metric
 
 
@@ -64,14 +88,7 @@ def evaluate_order_model(theta, data, error, order_width):
     # Set the parameters of the model (polynomial) object
     model = Legendre(theta, domain=(0, data.shape[1] - 1))
 
-    # Convert the model into a boolean region array
-    order_mask = order_region(order_width, model, data.shape)
-
-    # TODO: Implement a smoothed filter so the edges aren't so sharp. Use two logistic functions for each of the edges
-    # Note the normalization will need a square of the weights / sigma^2. This is due to combining uncertainty
-    # propagation for a weighted sum w^2 sigma^2 (the w = P / sigma^2 so one pair of the sigmas cancel)
-    # Evaluate the metric
-    return tophat_filter_metric(data, error, order_mask)
+    return smooth_order_metric(model, data, error, order_width)
 
 
 def fit_order_curve(data, error, order_width, initial_guess):
@@ -104,7 +121,7 @@ class OrderSolver(Stage):
     # taking the edge closest to the previous guess of the edge.
     ORDER_WIDTH = 93
     CENTER_CUT_WIDTH = 101
-    POLYNOMIAL_ORDER = 4
+    POLYNOMIAL_ORDER = 3
 
     def do_stage(self, image):
         if image.orders is None:

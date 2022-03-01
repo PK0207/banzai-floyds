@@ -83,7 +83,7 @@ class TestOrderDetection:
         skyflat_hdu['SCI'].header['OBSTYPE'] = 'SKYFLAT'
         skyflat_name = skyflat_info["filename"].replace("x00.fits", "f00.fits")
         filename = os.path.join('/archive', 'engineering', f'{skyflat_name}')
-        skyflat_hdu.writeto(filename)
+        skyflat_hdu.writeto(filename, overwrite=True)
         skyflat_hdu.close()
         # Process the data
         file_utils.post_to_archive_queue(filename, os.getenv('FITS_BROKER'),

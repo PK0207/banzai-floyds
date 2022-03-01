@@ -49,5 +49,5 @@ class FLOYDSFrameFactory(LCOFrameFactory):
                       for row in image['ORDER_COEFFS'].data]
             models = [np.polynomial.legendre.Legendre(coeff_set, domain=(0, image.data.shape[1] - 1))
                       for coeff_set in coeffs]
-            image.orders = Orders(models, image.data.shape, image['ORDER_COEFFS'].meta['WIDTH'])
+            image.orders = Orders(models, image.data.shape, image['ORDER_COEFFS'].meta['HEIGHT'])
         return image

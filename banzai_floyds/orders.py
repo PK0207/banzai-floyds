@@ -135,7 +135,7 @@ class OrderSolver(Stage):
             coeff_table[f'c{i}'].description = f'Coefficient for P_{i}'
 
         image.add_or_update(DataTable(coeff_table, name='ORDER_COEFFS',
-                                      meta=fits.Header({'ORDER_HEIGHT': self.ORDER_HEIGHT,
+                                      meta=fits.Header({'HEIGHT': self.ORDER_HEIGHT,
                                                         'POLYORD': self.POLYNOMIAL_ORDER})))
         image.is_master = True
 

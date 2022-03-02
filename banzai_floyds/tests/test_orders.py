@@ -59,6 +59,7 @@ def test_order_solver_stage():
 
     order_solver = OrderSolver(FakeContext())
     order_solver.ORDER_HEIGHT = order_height
+    order_solver.CENTER_CUT_WIDTH = 21
     image = FLOYDSObservationFrame([CCDData(data=data, uncertainty=error, meta=fits.Header({}))], 'foo.fits')
     image = order_solver.do_stage(image)
 

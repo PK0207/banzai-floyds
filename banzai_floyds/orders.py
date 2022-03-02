@@ -100,6 +100,35 @@ def fit_order_curve(data, error, order_height, initial_guess):
     return Legendre(best_fit.x, domain=(0, data.shape[1] - 1))
 
 
+def trace_order(data, error, order_height, initial_center, initial_center_x,
+                step_size=11, filter_width=21, search_height=7):
+    centers = []
+    xs = []
+    # keep stepping until you get to the edge of the chip
+    for x in range(initial_center_x, data.shape[1] - filter_width // 2, step_size):
+        if len(centers) == 0:
+            previous_center = initial_center
+        else:
+            previous_center = centers[-1]
+        section = slice(previous_center - search_height - order_height // 2,
+                        previous_center + search_height + order_height //2 + 1, 1), \
+                  slice(x - filter_width // 2, x + filter_width // 2 + 1, 1)
+        cut_center = estimate_order_centers(data[section], error[section], order_height)[0]
+        centers.append(cut_center + previous_center - search_height - order_height // 2)
+        xs.append(x)
+
+    # Go back to the center and start stepping the opposite direction
+    for x in range(initial_center_x - step_size, filter_width // 2, -step_size):
+        previous_center = centers[0]
+        section = slice(previous_center - search_height - order_height // 2,
+                        previous_center + search_height + order_height //2 + 1, 1), \
+                  slice(x - filter_width // 2, x + filter_width // 2 + 1, 1)
+        cut_center = estimate_order_centers(data[section], error[section], order_height)[0]
+        centers.insert(0, cut_center + previous_center - search_height - order_height // 2)
+        xs.insert(0, x)
+    return xs, centers
+
+
 class OrderLoader(CalibrationUser):
     def on_missing_master_calibration(self, image):
         if image.obstype == 'SKYFLAT':

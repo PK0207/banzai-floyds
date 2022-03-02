@@ -7,9 +7,15 @@ import banzai.dbs
 import os
 import pkg_resources
 from kombu import Connection, Exchange
-from astropy.io import ascii
 import mock
 import requests
+from astropy.io import fits, ascii
+import numpy as np
+from banzai.utils.fits_utils import download_from_s3
+import banzai.main
+from banzai_floyds import settings
+from banzai.utils import file_utils
+
 
 logger = logging.getLogger('banzai')
 
@@ -41,6 +47,18 @@ def celery_join():
             break
 
 
+def expected_filenames(file_table):
+    filenames = []
+    for row in file_table:
+        site = row['filename'][:3]
+        camera = row['filename'].split('-')[1]
+        dayobs = row['filename'].split('-')[2]
+        expected_file = os.path.join('/archive', 'engineering', site, camera, dayobs, 'processed',
+                                     row['filename'].replace('00.fits', '91.fits'))
+        filenames.append(expected_file)
+    return filenames
+
+
 # Note this is complicated by the fact that things are running as celery tasks.
 @pytest.mark.e2e
 @pytest.fixture(scope='module')
@@ -51,10 +69,46 @@ def init(mock_configdb):
 
 
 @pytest.mark.e2e
+@pytest.mark.detect_orders
+class TestOrderDetection:
+    @pytest.fixture(autouse=True)
+    def process_skyflat(self, init):
+        # Pull down our experimental skyflat
+        skyflat_info = ascii.read(pkg_resources.resource_filename('banzai_floyds.tests', 'data/test_skyflat.dat'))[0]
+        skyflat_info = dict(skyflat_info)
+        context = banzai.main.parse_args(settings, parse_system_args=False)
+        skyflat_hdu = fits.open(download_from_s3(skyflat_info, context))
+
+        # Munge the data to be OBSTYPE SKYFLAT
+        skyflat_hdu['SCI'].header['OBSTYPE'] = 'SKYFLAT'
+        skyflat_name = skyflat_info["filename"].replace("x00.fits", "f00.fits")
+        filename = os.path.join('/archive', 'engineering', f'{skyflat_name}')
+        skyflat_hdu.writeto(filename, overwrite=True)
+        skyflat_hdu.close()
+        # Process the data
+        file_utils.post_to_archive_queue(filename, os.getenv('FITS_BROKER'),
+                                         exchange_name=os.getenv('FITS_EXCHANGE'))
+
+        celery_join()
+
+    def test_that_order_mask_exists(self):
+        test_data = ascii.read(pkg_resources.resource_filename('banzai_floyds.tests', 'data/test_skyflat.dat'))
+        for row in test_data:
+            row['filename'] = row['filename'].replace("x00.fits", "f00.fits")
+        filenames = expected_filenames(test_data)
+        for expected_file in filenames:
+            assert os.path.exists(expected_file)
+            hdu = fits.open(expected_file)
+            assert 'ORDERS' in hdu
+            # Note there are only two orders in floyds
+            assert np.max(hdu['ORDERS'].data) == 2
+
+
+@pytest.mark.e2e
 @pytest.mark.science_frames
 class TestScienceFileCreation:
     @pytest.fixture(autouse=True)
-    def process_science_frames(self, init):
+    def process_science_frames(self):
         logger.info('Reducing individual frames')
 
         exchange = Exchange(os.getenv('FITS_EXCHANGE', 'fits_files'), type='fanout')
@@ -72,10 +126,5 @@ class TestScienceFileCreation:
 
     def test_if_science_frames_were_created(self):
         test_data = ascii.read(DATA_FILELIST)
-        for row in test_data:
-            site = row['filename'][:3]
-            camera = row['filename'].split('-')[1]
-            dayobs = row['filename'].split('-')[2]
-            expected_file = os.path.join('/archive', 'engineering', site, camera, dayobs, 'processed',
-                                         row['filename'].replace('00.fits', '91.fits'))
+        for expected_file in expected_filenames(test_data):
             assert os.path.exists(expected_file)

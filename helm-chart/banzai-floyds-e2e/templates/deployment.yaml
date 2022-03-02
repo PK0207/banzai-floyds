@@ -36,6 +36,15 @@ spec:
             limits:
               cpu: "1"
               memory: "1Gi"
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - 'response=$(redis-cli -h localhost ping); if [ "$response" != "PONG" ]; then exit 1; fi;'
+            initialDelaySeconds: 3
+            timeoutSeconds: 5
+            periodSeconds: 3
         - name: banzai-floyds-e2e-fits-exchange
           image: rabbitmq:3.7.9
           imagePullPolicy: IfNotPresent

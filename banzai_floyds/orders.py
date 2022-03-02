@@ -10,16 +10,16 @@ from astropy.io import fits
 
 
 class Orders:
-    def __init__(self, models, image_shape, order_width):
+    def __init__(self, models, image_shape, order_height):
         self._models = models
         self._image_shape = image_shape
-        self._order_width = order_width
+        self._order_height = order_height
 
     @property
     def data(self):
         order_data = np.zeros(self._image_shape, dtype=np.uint8)
         for i, model in enumerate(self._models):
-            order_data[order_region(self._order_width, model, self._image_shape)] = i + 1
+            order_data[order_region(self._order_height, model, self._image_shape)] = i + 1
         return order_data
 
     @property
@@ -58,25 +58,25 @@ def smooth_order_metric(model, data, error, width):
     return metric
 
 
-def order_region(order_width, center, image_size):
+def order_region(order_height, center, image_size):
     x = np.arange(image_size[1])
     y_centers = np.round(center(x)).astype(int)
     x2d, y2d = np.meshgrid(np.arange(image_size[1]), np.arange(image_size[0]))
     centered_coordinates = y2d - y_centers
-    order_mask = np.logical_and(centered_coordinates >= -1 - order_width // 2,
-                                centered_coordinates <= order_width // 2 + 1)
+    order_mask = np.logical_and(centered_coordinates >= -1 - order_height // 2,
+                                centered_coordinates <= order_height // 2 + 1)
     # Note we leave in the ability to filter out columns by using the domain attribute of the model
     order_mask = np.logical_and(order_mask, np.logical_and(x2d >= center.domain[0], x2d <= center.domain[1]))
     return order_mask
 
 
-def estimate_order_centers(data, error, order_width, peak_separation=10, min_signal_to_noise=100.0):
+def estimate_order_centers(data, error, order_height, peak_separation=10, min_signal_to_noise=100.0):
     matched_filtered = np.zeros(data.shape[0])
     for i in np.arange(data.shape[0]):
         # Run a matched filter using a top hat filter
         filter_model = Legendre([i], domain=(0, data.shape[1] - 1))
 
-        filter_region = order_region(order_width, filter_model, data.shape)
+        filter_region = order_region(order_height, filter_model, data.shape)
         matched_filtered[i] = tophat_filter_metric(data, error, filter_region)
     peaks = matched_filtered == maximum_filter1d(matched_filtered, size=peak_separation, mode='constant', cval=0.0)
     peaks = np.logical_and(peaks, matched_filtered > min_signal_to_noise)
@@ -84,18 +84,18 @@ def estimate_order_centers(data, error, order_width, peak_separation=10, min_sig
     return np.flatnonzero(peaks)
 
 
-def evaluate_order_model(theta, data, error, order_width):
+def evaluate_order_model(theta, data, error, order_height):
     # Set the parameters of the model (polynomial) object
     model = Legendre(theta, domain=(0, data.shape[1] - 1))
+    return smooth_order_metric(model, data, error, order_height)
 
-    return smooth_order_metric(model, data, error, order_width)
 
 
-def fit_order_curve(data, error, order_width, initial_guess):
+def fit_order_curve(data, error, order_height, initial_guess):
     # Note that having too high of signal to noise actually makes the gradient less smooth so the gradients will become
     # discontinuous. In our unit tests, it typically only led to a couple of pixels being off but convergence does
     # become more difficult.
-    best_fit = minimize(lambda *args: -evaluate_order_model(*args), initial_guess, args=(data, error, order_width),
+    best_fit = minimize(lambda *args: -evaluate_order_model(*args), initial_guess, args=(data, error, order_height),
                         method='Powell', options={'xtol': 1e-7, 'ftol': 1e-8, 'maxfev': 1e6})
     return Legendre(best_fit.x, domain=(0, data.shape[1] - 1))
 
@@ -117,9 +117,9 @@ class OrderLoader(CalibrationUser):
 
 
 class OrderSolver(Stage):
-    # Currently we hard code the order width to 93. If we wanted to measure it I recommend using a Canny filter and
+    # Currently we hard code the order height to 93. If we wanted to measure it I recommend using a Canny filter and
     # taking the edge closest to the previous guess of the edge.
-    ORDER_WIDTH = 93
+    ORDER_HEIGHT = 93
     CENTER_CUT_WIDTH = 101
     POLYNOMIAL_ORDER = 3
 
@@ -132,15 +132,15 @@ class OrderSolver(Stage):
             center_section = slice(None), slice(image.data.shape[1] // 2 - self.CENTER_CUT_WIDTH // 2,
                                                 image.data.shape[1] // 2 + self.CENTER_CUT_WIDTH // 2 + 1, 1)
             order_centers = estimate_order_centers(image.data[center_section], image.uncertainty[center_section],
-                                                   order_width=self.ORDER_WIDTH)
+                                                   order_height=self.ORDER_HEIGHT)
             initial_guesses = [(center,) + tuple(0 for _ in range(1, self.POLYNOMIAL_ORDER + 1))
                                for center in order_centers]
         else:
             # Load from previous solve
             initial_guesses = image.orders.coeffs
         # Do a fit to get the curvature of the slit
-        image.orders = Orders([fit_order_curve(image.data, image.uncertainty, self.ORDER_WIDTH, guess)
-                               for guess in initial_guesses], image.data.shape, self.ORDER_WIDTH)
+        image.orders = Orders([fit_order_curve(image.data, image.uncertainty, self.ORDER_HEIGHT, guess)
+                               for guess in initial_guesses], image.data.shape, self.ORDER_HEIGHT)
         image.add_or_update(ArrayData(image.orders.data, name='ORDERS'))
         coeff_table = [{f'c{i}': coeff for i, coeff in enumerate(coefficient_set)}
                        for coefficient_set in image.orders.coeffs]
@@ -152,7 +152,8 @@ class OrderSolver(Stage):
             coeff_table[f'c{i}'].description = f'Coefficient for P_{i}'
 
         image.add_or_update(DataTable(coeff_table, name='ORDER_COEFFS',
-                                      meta=fits.Header({'WIDTH': self.ORDER_WIDTH, 'POLYORD': self.POLYNOMIAL_ORDER})))
+                                      meta=fits.Header({'HEIGHT': self.ORDER_HEIGHT,
+                                                        'POLYORD': self.POLYNOMIAL_ORDER})))
         image.is_master = True
 
         return image

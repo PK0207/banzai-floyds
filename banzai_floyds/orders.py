@@ -51,7 +51,8 @@ def smooth_order_metric(model, data, error, width):
     # Note the minus sign for the top of the filter. This flips the logistic function. This means that x0 also has to
     # flip signs. We also have to add a half to each side of the filter so that the edges are at the edges of pixels
     # as the center of the pixels are the integer coordinates
-    weights = logistic(centered_coordinates, x0=-(width // 2 + 0.5), k=2) * logistic(-centered_coordinates, x0=-(width // 2 + 0.5), k=2)
+    weights = logistic(centered_coordinates, x0=-(width // 2 + 0.5), k=2)
+    weights *= logistic(-centered_coordinates, x0=-(width // 2 + 0.5), k=2)
     # Evaluate the metric
     metric = (data * weights / error / error).sum()
     metric /= ((weights * weights / error / error).sum()) ** 0.5
@@ -90,7 +91,6 @@ def evaluate_order_model(theta, data, error, order_height):
     return smooth_order_metric(model, data, error, order_height)
 
 
-
 def fit_order_curve(data, error, order_height, initial_guess):
     # Note that having too high of signal to noise actually makes the gradient less smooth so the gradients will become
     # discontinuous. In our unit tests, it typically only led to a couple of pixels being off but convergence does
@@ -111,7 +111,7 @@ def trace_order(data, error, order_height, initial_center, initial_center_x,
         else:
             previous_center = centers[-1]
         section = slice(previous_center - search_height - order_height // 2,
-                        previous_center + search_height + order_height //2 + 1, 1), \
+                        previous_center + search_height + order_height // 2 + 1, 1), \
                   slice(x - filter_width // 2, x + filter_width // 2 + 1, 1)
         cut_center = estimate_order_centers(data[section], error[section], order_height)[0]
         centers.append(cut_center + previous_center - search_height - order_height // 2)
@@ -149,7 +149,7 @@ class OrderSolver(Stage):
     # Currently we hard code the order height to 93. If we wanted to measure it I recommend using a Canny filter and
     # taking the edge closest to the previous guess of the edge.
     ORDER_HEIGHT = 93
-    CENTER_CUT_WIDTH = 101
+    CENTER_CUT_WIDTH = 31
     POLYNOMIAL_ORDER = 3
 
     def do_stage(self, image):

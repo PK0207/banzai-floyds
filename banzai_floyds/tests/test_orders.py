@@ -118,7 +118,7 @@ def test_smooth_order_hessian():
         function = lambda theta, x, height: smooth_order_jacobian(theta, x, i, height).sum()
         derivative = lambda theta, x, height: [smooth_order_hessian(theta, x, i, j, height).sum()
                                                for j in range(len(theta))]
-        assert check_grad(function, derivative, initial_params, (x, order_height)) < 1e-6
+        assert check_grad(function, derivative, initial_params, *(x, order_height)) < 0.2
 
 
 def test_matched_filter_jacobian():
@@ -136,7 +136,7 @@ def test_matched_filter_jacobian():
     error = np.sqrt(read_noise ** 2.0 + np.abs(data))
 
     args = data, error, smooth_order_weights, smooth_order_jacobian, smooth_order_hessian, x, order_height
-    grad_error = check_grad(matched_filter_metric, matched_filter_jacobian, input_params, args)
+    grad_error = check_grad(matched_filter_metric, matched_filter_jacobian, input_params, *args)
     assert grad_error < 1e-6
 
 
@@ -158,4 +158,4 @@ def test_matched_filter_hessian():
     for i in range(len(input_params)):
         function = lambda *args: matched_filter_jacobian(*args)[i]
         derivative = lambda *args: matched_filter_hessian(*args)[i]
-        assert check_grad(function, derivative, input_params, args) < 1e-6
+        assert check_grad(function, derivative, input_params, *args) < 1e-6

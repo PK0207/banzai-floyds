@@ -55,17 +55,17 @@ def matched_filter_hessian(theta, data, error, weights_function, weights_jacobia
     signal = matched_filter_signal(data, error, weights)
     normalization = matched_filter_normalization(error, weights)
 
-    signal_jacobian = matched_filter_signal_jacobian(theta, x, data, error, weights_jacobian_function)
+    signal_jacobian = matched_filter_signal_jacobian(theta, x, data, error, weights_jacobian_function, *args)
     normalization_jacobian = matched_filter_normalization_jacobian(theta, x, weights, error,
-                                                                   weights_jacobian_function)
+                                                                   weights_jacobian_function, *args)
 
-    weights_hessian = np.zeros((theta.size, theta.size))
+    weights_hessian = np.zeros((theta.size, theta.size, *data.shape))
     for i in range(len(theta)):
         for j in range(len(theta)):
-            if weights_hessian[j, i] != 0.0:
+            if weights_hessian[j, i].sum() != 0.0:
                 weights_hessian[i, j] = weights_hessian[j, i]
             else:
-                weights_hessian[i, j] = weights_hessian_function(theta, x, i, j)
+                weights_hessian[i, j] = weights_hessian_function(theta, x, i, j, *args)
 
     signal_hessian = np.zeros((theta.size, theta.size))
     for i in range(len(theta)):
@@ -84,7 +84,8 @@ def matched_filter_hessian(theta, data, error, weights_function, weights_jacobia
                 # the hessian of the normalization
                 # ∂ⱼn = Σ(weights * ∂ⱼweights / σ²)/n
                 # ∂ᵢ∂ⱼn = n⁻² (Σ((∂ᵢweights * ∂ⱼweights  + weights * ∂ᵢ∂ⱼweights)/ σ²) * n - ∂ᵢn ∂ⱼn)
-                first_term = weights_jacobian_function() * weights_jacobian_function()
+                first_term = weights_jacobian_function(theta, x, i, *args)
+                first_term *= weights_jacobian_function(theta, x, j, *args)
                 first_term += weights * weights_hessian[i, j]
                 first_term /= error * error
                 normalization_hessian[i, j] = first_term.sum() * normalization

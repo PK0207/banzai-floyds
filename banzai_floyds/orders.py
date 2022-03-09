@@ -3,10 +3,11 @@ from banzai.stages import Stage
 import numpy as np
 from scipy.ndimage.filters import maximum_filter1d
 from numpy.polynomial.legendre import Legendre
-from scipy.optimize import minimize
 from banzai.data import ArrayData, DataTable
 from astropy.table import Table
 from astropy.io import fits
+
+from banzai_floyds.matched_filter import maximize_match_filter
 
 
 class Orders:
@@ -38,25 +39,60 @@ def tophat_filter_metric(data, error, region):
     return metric
 
 
-def smooth_order_metric(model, data, error, width):
-    x = np.arange(data.shape[1])
-    y_centers = model(x)
-    x2d, y2d = np.meshgrid(x, np.arange(data.shape[0]))
+def smooth_order_weights(params, x, height):
+    x2d, y2d = x
+    model = Legendre(params, domain=(np.min(x2d), np.max(x2d)))
+
+    y_centers = model(x2d)
     centered_coordinates = y2d - y_centers
 
-    # This is adapted from Zackay et al. 2017
     # We Implement a smoothed filter so the edges aren't so sharp. Use two logistic functions for each of the edges
     # Note the normalization will need a square of the weights / sigma^2. This is due to combining uncertainty
     # propagation for a weighted sum w^2 sigma^2 (the w = filter / sigma^2 so one pair of the sigmas cancel)
     # Note the minus sign for the top of the filter. This flips the logistic function. This means that x0 also has to
     # flip signs. We also have to add a half to each side of the filter so that the edges are at the edges of pixels
     # as the center of the pixels are the integer coordinates
-    weights = logistic(centered_coordinates, x0=-(width // 2 + 0.5), k=2)
-    weights *= logistic(-centered_coordinates, x0=-(width // 2 + 0.5), k=2)
-    # Evaluate the metric
-    metric = (data * weights / error / error).sum()
-    metric /= ((weights * weights / error / error).sum()) ** 0.5
-    return metric
+    weights = logistic(centered_coordinates, x0=-(height // 2 + 0.5), k=2)
+    weights *= logistic(-centered_coordinates, x0=-(height // 2 + 0.5), k=2)
+    return weights
+
+
+def smooth_order_jacobian(theta, x, i, height, k=2):
+    x2d, y2d = x
+    model = Legendre(theta, domain=(np.min(x2d), np.max(x2d)))
+    # We need the first derivative of the logistic function
+    # half-height = h = height // 2 + 0.5
+    # E+ = e⁻²ᵏ⁽ʸ⁻ᶜⁱ ᵖⁱ⁽ˣ⁾⁺ʰ⁾
+    # E- = e⁻²ᵏ⁽⁻ʸ⁻ᶜⁱ ᵖⁱ⁽ˣ⁾⁻ʰ⁾
+    # Note we have used the Einstein summation notation
+    # weights = w = (1 + E+)⁻¹(1 + E-)⁻¹
+    # ∂ⱼw = -k E+ (1 + E+)⁻²(1 + E-)⁻¹ pⱼ(x) + -k E- (1 + E+)⁻¹(1 + E-)⁻² pⱼ(x)
+    # ∂ⱼw = -k pⱼ(x) (E+ (1 + E-) + E- (1 + E+)) (1 + E+)⁻²(1 + E-)⁻²
+    half_height = height // 2 + 0.5
+    y_centers = model(x2d)
+    eplus = np.exp(-2.0 * k * (y2d - y_centers + half_height))
+    eminus = np.exp(-2.0 * k * (-y2d - y_centers - half_height))
+    polynomial_i = model.basis(i, domain=(np.min(x2d), np.max(x2d)))(x2d)
+
+    return -k * polynomial_i * (eplus * (1 + eminus) + eminus * (1 + eplus)) * (1 + eplus) ** -2 * (1 + eminus) ** -2
+
+
+def smooth_order_hessian(theta, x, i, j, height, k=2):
+    # ∂ⱼw = -k E+ (1 + E+)⁻²(1 + E-)⁻¹ pⱼ(x) + -k E- (1 + E+)⁻¹(1 + E-)⁻² pⱼ(x)
+    # ∂ᵢ∂ⱼw = k²(1 + E-)⁻¹ pⱼ(x) pᵢ(x) E+ (E+ - 1) (1 + E+)⁻³ + k²(1 + E+)⁻¹ pⱼ(x) pᵢ(x) E- (E- - 1) (1 + E-)⁻³ + \
+    #         2 k² E+ E- (1 + E+)⁻²(1 + E-)⁻²
+    x2d, y2d = x
+    model = Legendre(theta, domain=(np.min(x2d), np.max(x2d)))
+    half_height = height // 2 + 0.5
+    y_centers = model(x2d)
+    eplus = np.exp(-2.0 * k * (y2d - y_centers + half_height))
+    eminus = np.exp(-2.0 * k * (-y2d - y_centers - half_height))
+    polynomial_i = model.basis(i, domain=(np.min(x2d), np.max(x2d)))(x2d)
+    polynomial_j = model.basis(j, domain=(np.min(x2d), np.max(x2d)))(x2d)
+    hessian = k ** 2 * (1 + eminus) ** -1 * polynomial_i * polynomial_j * eplus * (eplus - 1) * (1 + eplus) ** -3
+    hessian += k ** 2 * (1 + eplus) ** -1 * polynomial_i * polynomial_j * eminus * (eminus - 1) * (1 + eminus)  ** -3
+    hessian += 2.0 * k ** 2 * eplus * eminus * (1 + eplus) ** -2 * (1 + eminus) ** -2
+    return hessian
 
 
 def order_region(order_height, center, image_size):
@@ -85,19 +121,13 @@ def estimate_order_centers(data, error, order_height, peak_separation=10, min_si
     return np.flatnonzero(peaks)
 
 
-def evaluate_order_model(theta, data, error, order_height):
-    # Set the parameters of the model (polynomial) object
-    model = Legendre(theta, domain=(0, data.shape[1] - 1))
-    return smooth_order_metric(model, data, error, order_height)
-
-
 def fit_order_curve(data, error, order_height, initial_guess):
-    # Note that having too high of signal to noise actually makes the gradient less smooth so the gradients will become
-    # discontinuous. In our unit tests, it typically only led to a couple of pixels being off but convergence does
-    # become more difficult.
-    best_fit = minimize(lambda *args: -evaluate_order_model(*args), initial_guess, args=(data, error, order_height),
-                        method='Powell', options={'xtol': 1e-7, 'ftol': 1e-8, 'maxfev': 1e6})
-    return Legendre(best_fit.x, domain=(0, data.shape[1] - 1))
+    x = np.meshgrid(np.arange(data.shape[1]), np.arange(data.shape[0]))
+    best_fit_params = maximize_match_filter(initial_guess, data, error, smooth_order_weights, x,
+                                            weights_jacobian_function=smooth_order_jacobian,
+                                            weights_hessian_function=smooth_order_hessian,
+                                            args=(order_height,))
+    return Legendre(best_fit_params, domain=(0, data.shape[1] - 1))
 
 
 def trace_order(data, error, order_height, initial_center, initial_center_x,
@@ -126,7 +156,7 @@ def trace_order(data, error, order_height, initial_center, initial_center_x,
         cut_center = estimate_order_centers(data[section], error[section], order_height)[0]
         centers.insert(0, cut_center + previous_center - search_height - order_height // 2)
         xs.insert(0, x)
-    return xs, centers
+    return np.array(xs), np.array(centers)
 
 
 class OrderLoader(CalibrationUser):
@@ -151,6 +181,7 @@ class OrderSolver(Stage):
     ORDER_HEIGHT = 93
     CENTER_CUT_WIDTH = 31
     POLYNOMIAL_ORDER = 3
+    ORDER_REGIONS = [(0, 1775), (450, 1975)]
 
     def do_stage(self, image):
         if image.orders is None:
@@ -162,8 +193,14 @@ class OrderSolver(Stage):
                                                 image.data.shape[1] // 2 + self.CENTER_CUT_WIDTH // 2 + 1, 1)
             order_centers = estimate_order_centers(image.data[center_section], image.uncertainty[center_section],
                                                    order_height=self.ORDER_HEIGHT)
-            initial_guesses = [(center,) + tuple(0 for _ in range(1, self.POLYNOMIAL_ORDER + 1))
-                               for center in order_centers]
+            initial_guesses = []
+            for i, order_center in enumerate(order_centers):
+                x, order_locations = trace_order(image.data, image.uncertainty, self.ORDER_HEIGHT,
+                                                 order_center, image.data.shape[1] // 2)
+                good_region = np.logical_and(x >= self.ORDER_REGIONS[i][0], x <= self.ORDER_REGIONS[i][1])
+                initial_model = Legendre.fit(deg=self.POLYNOMIAL_ORDER, x=x[good_region],
+                                             y=order_locations[good_region], domain=(0, image.data.shape[1]))
+                initial_guesses.append(initial_model.coef)
         else:
             # Load from previous solve
             initial_guesses = image.orders.coeffs

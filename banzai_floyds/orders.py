@@ -6,6 +6,7 @@ from numpy.polynomial.legendre import Legendre
 from banzai.data import ArrayData, DataTable
 from astropy.table import Table
 from astropy.io import fits
+from scipy.special import expit
 
 from banzai_floyds.matched_filter import maximize_match_filter
 
@@ -28,10 +29,6 @@ class Orders:
         return [model.coef for model in self._models]
 
 
-def logistic(x, x0=0, k=1):
-    return 1.0 / (1.0 + np.exp(-2 * k * (x - x0)))
-
-
 def tophat_filter_metric(data, error, region):
     # This is adapted from Zackay et al. 2017
     metric = (data[region] / error[region] / error[region]).sum()
@@ -52,29 +49,30 @@ def smooth_order_weights(params, x, height):
     # Note the minus sign for the top of the filter. This flips the logistic function. This means that x0 also has to
     # flip signs. We also have to add a half to each side of the filter so that the edges are at the edges of pixels
     # as the center of the pixels are the integer coordinates
-    weights = logistic(centered_coordinates, x0=-(height // 2 + 0.5), k=2)
-    weights *= logistic(-centered_coordinates, x0=-(height // 2 + 0.5), k=2)
+    k = 2
+    half_height = height // 2 + 0.5
+    weights = expit(k * (y2d - y_centers + half_height))
+    weights *= expit(k * (-y2d + y_centers + half_height))
     return weights
 
 
 def smooth_order_jacobian(theta, x, i, height, k=2):
     x2d, y2d = x
     model = Legendre(theta, domain=(np.min(x2d), np.max(x2d)))
-    # We need the first derivative of the logistic function
-    # half-height = h = height // 2 + 0.5
-    # E+ = e⁻²ᵏ⁽ʸ⁻ᶜⁱ ᵖⁱ⁽ˣ⁾⁺ʰ⁾
-    # E- = e⁻²ᵏ⁽⁻ʸ⁻ᶜⁱ ᵖⁱ⁽ˣ⁾⁻ʰ⁾
+    # We need the first derivative of the sigmoid function
+    # h = half_height
     # Note we have used the Einstein summation notation
-    # weights = w = (1 + E+)⁻¹(1 + E-)⁻¹
-    # ∂ⱼw = -k E+ (1 + E+)⁻²(1 + E-)⁻¹ pⱼ(x) + -k E- (1 + E+)⁻¹(1 + E-)⁻² pⱼ(x)
-    # ∂ⱼw = -k pⱼ(x) (E+ (1 + E-) + E- (1 + E+)) (1 + E+)⁻²(1 + E-)⁻²
+    # weights = w = σ(y - cᵢ Pᵢ(x) + h) σ(-y + cᵢ Pᵢ(x) + h)
+    # use σ' = σ (1 - σ)
+    # ∂ⱼw = k Pᵢ(x) σ(y - cᵢ Pᵢ(x) + h) (1 - σ(y - cᵢ Pᵢ(x) + h)) σ(-y + cᵢ Pᵢ(x) + h) + \
+    # - k Pᵢ(x) σ(y - cᵢ Pᵢ(x) + h) σ(-y + cᵢ Pᵢ(x) + h) (1 - σ(-y + cᵢ Pᵢ(x) + h))
+    # ∂ⱼw = k Pᵢ(x) σ(y - cᵢ Pᵢ(x) + h) σ(-y + cᵢ Pᵢ(x) + h) (σ(-y + cᵢ Pᵢ(x) + h) - σ(y - cᵢ Pᵢ(x) + h))
     half_height = height // 2 + 0.5
     y_centers = model(x2d)
-    eplus = np.exp(-2.0 * k * (y2d - y_centers + half_height))
-    eminus = np.exp(-2.0 * k * (-y2d - y_centers - half_height))
     polynomial_i = model.basis(i, domain=(np.min(x2d), np.max(x2d)))(x2d)
-
-    return -k * polynomial_i * (eplus * (1 + eminus) + eminus * (1 + eplus)) * (1 + eplus) ** -2 * (1 + eminus) ** -2
+    sigma_plus = expit(k * (y2d - y_centers + half_height))
+    sigma_minus = expit(k * (-y2d + y_centers + half_height))
+    return k * polynomial_i * sigma_minus * sigma_plus * (sigma_minus - sigma_plus)
 
 
 def smooth_order_hessian(theta, x, i, j, height, k=2):
@@ -85,8 +83,8 @@ def smooth_order_hessian(theta, x, i, j, height, k=2):
     model = Legendre(theta, domain=(np.min(x2d), np.max(x2d)))
     half_height = height // 2 + 0.5
     y_centers = model(x2d)
-    eplus = np.exp(-2.0 * k * (y2d - y_centers + half_height))
-    eminus = np.exp(-2.0 * k * (-y2d - y_centers - half_height))
+    eplus = np.exp(-2.0 * k * (y2d - y_centers - half_height))
+    eminus = np.exp(-2.0 * k * (-y2d + y_centers - half_height))
     polynomial_i = model.basis(i, domain=(np.min(x2d), np.max(x2d)))(x2d)
     polynomial_j = model.basis(j, domain=(np.min(x2d), np.max(x2d)))(x2d)
     hessian = k ** 2 * (1 + eminus) ** -1 * polynomial_i * polynomial_j * eplus * (eplus - 1) * (1 + eplus) ** -3

@@ -106,7 +106,7 @@ def test_smooth_order_jacobian():
     x = np.meshgrid(np.arange(nx), np.arange(ny))
     function = lambda *args: smooth_order_weights(*args).sum()
     derivative = lambda theta, x, height: [smooth_order_jacobian(theta, x, i, height).sum() for i in range(len(theta))]
-    assert check_grad(function, derivative, initial_params, (x, order_height)) < 1e-6
+    assert check_grad(function, derivative, initial_params, *(x, order_height)) < 1e-3
 
 
 def test_smooth_order_hessian():

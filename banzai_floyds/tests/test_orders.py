@@ -104,9 +104,18 @@ def test_smooth_order_jacobian():
     order_height = 85
     nx, ny = 531, 497
     x = np.meshgrid(np.arange(nx), np.arange(ny))
-    function = lambda *args: smooth_order_weights(*args).sum()
-    derivative = lambda theta, x, height: [smooth_order_jacobian(theta, x, i, height).sum() for i in range(len(theta))]
-    assert check_grad(function, derivative, initial_params, *(x, order_height)) < 1e-3
+    h = 1e-5
+
+    # Check the gradient compared to numerical approximations
+    # f'~= (f(x + h) - f(x - h))/(2 h)
+    for i in range(len(initial_params)):
+        actual_jacobian = smooth_order_jacobian(initial_params, x, i, order_height)
+        step = np.zeros(len(initial_params))
+        step[i] = h
+        numerical_jacobian = smooth_order_weights(initial_params + step, x, order_height)
+        numerical_jacobian -= smooth_order_weights(initial_params - step, x, order_height)
+        numerical_jacobian /= 2.0 * h
+        np.testing.assert_allclose(actual_jacobian, numerical_jacobian, atol=1e-9)
 
 
 def test_smooth_order_hessian():
@@ -114,11 +123,18 @@ def test_smooth_order_hessian():
     order_height = 87
     nx, ny = 521, 495
     x = np.meshgrid(np.arange(nx), np.arange(ny))
+    h = 1e-5
     for i in range(len(initial_params)):
-        function = lambda theta, x, height: smooth_order_jacobian(theta, x, i, height).sum()
-        derivative = lambda theta, x, height: [smooth_order_hessian(theta, x, i, j, height).sum()
-                                               for j in range(len(theta))]
-        assert check_grad(function, derivative, initial_params, *(x, order_height)) < 0.2
+        # Check the gradient compared to numerical approximations
+        # f'~= (f(x + h) - f(x - h))/(2 h)
+        for j in range(len(initial_params)):
+            actual_hessian = smooth_order_hessian(initial_params, x, i, j, order_height)
+            step = np.zeros(len(initial_params))
+            step[j] = h
+            numerical_hessian = smooth_order_jacobian(initial_params + step, x, i, order_height)
+            numerical_hessian -= smooth_order_jacobian(initial_params - step, x, i, order_height)
+            numerical_hessian /= 2.0 * h
+            np.testing.assert_allclose(actual_hessian, numerical_hessian, atol=1e-9)
 
 
 def test_matched_filter_jacobian():

@@ -63,22 +63,23 @@ def smooth_order_jacobian(theta, x, i, height, k=2):
     # Note we have used the Einstein summation notation
     # weights = w = σ(y - cᵢ Pᵢ(x) + h) σ(-y + cᵢ Pᵢ(x) + h)
     # use σ' = σ (1 - σ)
-    # ∂ⱼw = k Pᵢ(x) σ(y - cᵢ Pᵢ(x) + h) (1 - σ(y - cᵢ Pᵢ(x) + h)) σ(-y + cᵢ Pᵢ(x) + h) + \
-    # - k Pᵢ(x) σ(y - cᵢ Pᵢ(x) + h) σ(-y + cᵢ Pᵢ(x) + h) (1 - σ(-y + cᵢ Pᵢ(x) + h))
-    # ∂ⱼw = k Pᵢ(x) σ(y - cᵢ Pᵢ(x) + h) σ(-y + cᵢ Pᵢ(x) + h) (σ(-y + cᵢ Pᵢ(x) + h) - σ(y - cᵢ Pᵢ(x) + h))
+    # Note the minus signs come from when the polynomials are added or subtracted
+    # ∂ⱼw = -k Pⱼ(x) σ(y - cᵢ Pᵢ(x) + h) (1 - σ(y - cᵢ Pᵢ(x) + h)) σ(-y + cᵢ Pᵢ(x) + h) + \
+    # + k Pⱼ(x) σ(y - cᵢ Pᵢ(x) + h) σ(-y + cᵢ Pᵢ(x) + h) (1 - σ(-y + cᵢ Pᵢ(x) + h))
+    # ∂ⱼw = k Pⱼ(x) σ(y - cᵢ Pᵢ(x) + h) σ(-y + cᵢ Pᵢ(x) + h) (σ(y - cᵢ Pᵢ(x) + h) - σ(-y + cᵢ Pᵢ(x) + h))
     half_height = height // 2 + 0.5
     y_centers = model(x2d)
     polynomial_i = model.basis(i, domain=(np.min(x2d), np.max(x2d)))(x2d)
     sigma_plus = expit(k * (y2d - y_centers + half_height))
     sigma_minus = expit(k * (-y2d + y_centers + half_height))
-    return k * polynomial_i * sigma_minus * sigma_plus * (sigma_minus - sigma_plus)
+    return k * polynomial_i * sigma_minus * sigma_plus * (sigma_plus - sigma_minus)
 
 
 def smooth_order_hessian(theta, x, i, j, height, k=2):
     # σ+ = (y - cᵢ Pᵢ(x) + h)
     # σ- = σ(-y + cᵢ Pᵢ(x) + h)
-    # ∂ᵢ∂ⱼw = k² Pᵢ Pⱼ (σ+ σ- (1 - σ-) (σ- - σ+) + σ- σ+ (1 - σ+) (σ- - σ+) + σ- σ+ (σ- (1 - σ-) - σ+ (1 - σ+)))
-    # ∂ᵢ∂ⱼw = k² Pᵢ Pⱼ (3 σ- - 2 σ-² - 3 σ+ + 2 σ+²)
+    # ∂ᵢ∂ⱼw = k² Pᵢ Pⱼ (σ+ σ- (1 - σ-) (σ+ - σ-) - σ- σ+ (1 - σ+) (σ+ - σ-) - σ- σ+ (σ- (1 - σ-) + σ+ (1 - σ+)))
+    # ∂ᵢ∂ⱼw = k² Pᵢ Pⱼ σ+ σ- ((σ+ - σ-)² +  σ+ (σ+ - 1) + σ- (σ- - 1))
     x2d, y2d = x
     model = Legendre(theta, domain=(np.min(x2d), np.max(x2d)))
     half_height = height // 2 + 0.5
@@ -87,7 +88,8 @@ def smooth_order_hessian(theta, x, i, j, height, k=2):
     sigma_minus = expit(k * (-y2d + y_centers + half_height))
     polynomial_i = model.basis(i, domain=(np.min(x2d), np.max(x2d)))(x2d)
     polynomial_j = model.basis(j, domain=(np.min(x2d), np.max(x2d)))(x2d)
-    hessian = 3 * sigma_minus - 2 * sigma_minus * sigma_minus - 3 * sigma_plus + 2 * sigma_plus * sigma_plus
+    hessian = (sigma_plus - sigma_minus) * (sigma_plus - sigma_minus)
+    hessian += sigma_plus * (sigma_plus - 1) + sigma_minus * (sigma_minus - 1)
     return k * k * polynomial_j * polynomial_i * sigma_plus * sigma_minus * hessian
 
 

@@ -25,9 +25,9 @@ def matched_filter_signal_jacobian(theta, x, data, error, weights_jacobian_funct
                      for i in range(len(theta))])
 
 
-def matched_filter_normalization_jacobian(theta, x, weights, error, weights_jacobian_function, *args):
+def matched_filter_normalization_jacobian(theta, x, weights, error, weights_jacobian_function, normalization, *args):
     # n' = sum weights * weights'/ sigma^2 / n
-    return np.array([(2.0 * weights * weights_jacobian_function(theta, x, i, *args) / error / error).sum()
+    return np.array([(weights * weights_jacobian_function(theta, x, i, *args) / error / error).sum() / normalization
                      for i in range(len(theta))])
 
 
@@ -44,7 +44,7 @@ def matched_filter_jacobian(theta, data, error, weights_function, weights_jacobi
     signal_jacobian = matched_filter_signal_jacobian(theta, x, data, error, weights_jacobian_function, *args)
 
     normalization_jacobian = matched_filter_normalization_jacobian(theta, x, weights, error, weights_jacobian_function,
-                                                                   *args)
+                                                                   normalization, *args)
     return (normalization * signal_jacobian - signal * normalization_jacobian) / normalization / normalization
 
 
@@ -57,7 +57,8 @@ def matched_filter_hessian(theta, data, error, weights_function, weights_jacobia
 
     signal_jacobian = matched_filter_signal_jacobian(theta, x, data, error, weights_jacobian_function, *args)
     normalization_jacobian = matched_filter_normalization_jacobian(theta, x, weights, error,
-                                                                   weights_jacobian_function, *args)
+                                                                   weights_jacobian_function, normalization,
+                                                                   *args)
 
     weights_hessian = np.zeros((theta.size, theta.size, *data.shape))
     for i in range(len(theta)):

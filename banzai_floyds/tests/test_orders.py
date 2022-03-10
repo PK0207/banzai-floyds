@@ -172,6 +172,5 @@ def test_matched_filter_hessian():
 
     args = data, error, smooth_order_weights, smooth_order_jacobian, smooth_order_hessian, x, order_height
     for i in range(len(input_params)):
-        function = lambda *args: matched_filter_jacobian(*args)[i]
-        derivative = lambda *args: matched_filter_hessian(*args)[i]
-        assert check_grad(function, derivative, input_params, *args) < 1e-6
+        assert check_grad(lambda *args: matched_filter_jacobian(*args)[i],
+                          lambda *args: matched_filter_hessian(*args)[i], input_params, *args) < 1e-6

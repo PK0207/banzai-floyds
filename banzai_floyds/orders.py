@@ -151,7 +151,7 @@ def trace_order(data, error, order_height, initial_center, initial_center_x,
     for x in range(initial_center_x - step_size, filter_width // 2, -step_size):
         previous_center = centers[0]
         y_section = slice(previous_center - search_height - order_height // 2,
-                          previous_center + search_height + order_height // 2 + 1, 1),
+                          previous_center + search_height + order_height // 2 + 1, 1)
         x_section = slice(x - filter_width // 2, x + filter_width // 2 + 1, 1)
         section = y_section, x_section
         cut_center = estimate_order_centers(data[section], error[section], order_height)[0]

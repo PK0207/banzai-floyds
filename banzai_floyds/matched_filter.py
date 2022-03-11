@@ -102,7 +102,8 @@ def matched_filter_hessian(theta, data, error, weights_function, weights_jacobia
                 continue
             # Start with this: (∂ⱼn ∂ᵢs + n ∂ⱼ∂ᵢs -s ∂ⱼ∂ᵢn - ∂ᵢn ∂ⱼs)
             filter_hessian[i, j] = normalization_jacobian[j] * signal_jacobian[i] + normalization * signal_hessian[i, j]
-            filter_hessian -= signal * normalization_hessian[i, j] + normalization_jacobian[i] * signal_jacobian[j]
+            filter_hessian[i, j] -= signal * normalization_hessian[i, j]
+            filter_hessian[i, j] -= normalization_jacobian[i] * signal_jacobian[j]
             filter_hessian[i, j] *= normalization ** 2.0
             # 2 n ∂ⱼn (n ∂ᵢs - s ∂ᵢn)
             term2 = normalization * signal_jacobian[i] - signal * normalization_jacobian[i]

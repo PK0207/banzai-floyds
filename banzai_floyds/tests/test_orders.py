@@ -7,7 +7,6 @@ from banzai.tests.utils import FakeContext
 from banzai_floyds.frames import FLOYDSObservationFrame
 from banzai.data import CCDData
 from astropy.io import fits
-from scipy.optimize import check_grad
 
 
 def test_blind_center_search():
@@ -142,6 +141,7 @@ def test_matched_filter_jacobian():
     order_height = 85
     nx, ny = 531, 497
     x = np.meshgrid(np.arange(nx), np.arange(ny))
+    h = 1e-5
     np.random.seed(21937415)
     data = np.zeros((ny, nx))
     read_noise = 5  # everything is gain = 1
@@ -152,8 +152,18 @@ def test_matched_filter_jacobian():
     error = np.sqrt(read_noise ** 2.0 + np.abs(data))
 
     args = data, error, smooth_order_weights, smooth_order_jacobian, smooth_order_hessian, x, order_height
-    grad_error = check_grad(matched_filter_metric, matched_filter_jacobian, input_params, *args)
-    assert grad_error < 1e-6
+
+    for i in range(len(input_params)):
+        for param_step in np.arange(input_params[i] - 5, input_params[i] + 5, 0.1):
+            params = input_params.copy()
+            params[i] = param_step
+            actual_jacobian = matched_filter_jacobian(params, *args)
+            derivative_step = np.zeros(len(input_params))
+            derivative_step[i] = h
+            numerical_jacobian = matched_filter_metric(params + derivative_step, *args)
+            numerical_jacobian -= matched_filter_metric(params - derivative_step, *args)
+            numerical_jacobian /= 2.0 * h
+            np.testing.assert_allclose(actual_jacobian[i], numerical_jacobian, atol=2e-7)
 
 
 def test_matched_filter_hessian():
@@ -171,6 +181,22 @@ def test_matched_filter_hessian():
     error = np.sqrt(read_noise ** 2.0 + np.abs(data))
 
     args = data, error, smooth_order_weights, smooth_order_jacobian, smooth_order_hessian, x, order_height
+    h = 1e-5
     for i in range(len(input_params)):
-        assert check_grad(lambda *args: matched_filter_jacobian(*args)[i],
-                          lambda *args: matched_filter_hessian(*args)[i], input_params, *args) < 1e-6
+        # Check the gradient compared to numerical approximations
+        # f'~= (f(x + h) - f(x - h))/(2 h)
+        for j in range(i + 1):
+            numerical_hessians = []
+            actual_hessians = []
+            for param_step in np.arange(input_params[j] - 5, input_params[j] + 5, 1):
+                params = input_params.copy()
+                params[i] = param_step
+                actual_hessian = matched_filter_hessian(params, *args)
+                actual_hessians.append(actual_hessian[i, j])
+                derivative_step = np.zeros(len(input_params))
+                derivative_step[j] = h
+                numerical_hessian = matched_filter_jacobian(params + derivative_step, *args)[i]
+                numerical_hessian -= matched_filter_jacobian(params - derivative_step, *args)[i]
+                numerical_hessian /= 2.0 * h
+                numerical_hessians.append(numerical_hessian)
+            np.testing.assert_allclose(actual_hessians, numerical_hessians, atol=1e-9)

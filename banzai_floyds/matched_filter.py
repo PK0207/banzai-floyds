@@ -84,13 +84,13 @@ def matched_filter_hessian(theta, data, error, weights_function, weights_jacobia
             else:
                 # the hessian of the normalization
                 # ∂ⱼn = Σ(weights * ∂ⱼweights / σ²)/n
-                # ∂ᵢ∂ⱼn = n⁻² (Σ((∂ᵢweights * ∂ⱼweights  + weights * ∂ᵢ∂ⱼweights)/ σ²) * n - ∂ᵢn ∂ⱼn)
+                # ∂ᵢ∂ⱼn = n⁻² (Σ((∂ᵢweights * ∂ⱼweights  + weights * ∂ᵢ∂ⱼweights)/ σ²) * n - n * ∂ᵢn ∂ⱼn)
                 first_term = weights_jacobian_function(theta, x, i, *args)
                 first_term *= weights_jacobian_function(theta, x, j, *args)
                 first_term += weights * weights_hessian[i, j]
                 first_term /= error * error
                 normalization_hessian[i, j] = first_term.sum() * normalization
-                normalization_hessian[i, j] -= normalization_jacobian[i] * normalization_jacobian[j]
+                normalization_hessian[i, j] -= normalization_jacobian[i] * normalization_jacobian[j] * normalization
                 normalization_hessian[i, j] /= normalization * normalization
 
     filter_hessian = np.zeros((theta.size, theta.size))
@@ -101,8 +101,8 @@ def matched_filter_hessian(theta, data, error, weights_function, weights_jacobia
                 filter_hessian[i, j] = filter_hessian[j, i]
                 continue
             # Start with this: (∂ⱼn ∂ᵢs + n ∂ⱼ∂ᵢs -s ∂ⱼ∂ᵢn - ∂ᵢn ∂ⱼs)
-            filter_hessian[i, j] = normalization_jacobian[j] * signal_jacobian[i] + normalization * signal_hessian[j, i]
-            filter_hessian -= signal * normalization_hessian[j, i] - normalization_jacobian[i] * signal_jacobian[j]
+            filter_hessian[i, j] = normalization_jacobian[j] * signal_jacobian[i] + normalization * signal_hessian[i, j]
+            filter_hessian -= signal * normalization_hessian[i, j] + normalization_jacobian[i] * signal_jacobian[j]
             filter_hessian[i, j] *= normalization ** 2.0
             # 2 n ∂ⱼn (n ∂ᵢs - s ∂ᵢn)
             term2 = normalization * signal_jacobian[i] - signal * normalization_jacobian[i]

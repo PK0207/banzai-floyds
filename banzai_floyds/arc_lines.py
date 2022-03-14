@@ -2,43 +2,43 @@
 Line lists from FLOYDS arc frames:
 Wavelengths, source, notes, and used lines are sourced from FLOYDS_lines.text
 Strengths are determined for the 2" slit using ogg2m001-en06-20220222-0036-a00.fits and are relative to strongest line.
+Blue lines have been calibrated to match the red strengths based on the overlapping 5460.75 line.
 Lines without strengths could not be found, possibly too weak or blended with nearby lines.
 """
 
-blue_lines = [{'wavelength': 3650.158, 'line_strength': 0.2591, 'line_source': 'Hg', 'line_notes': ''},
+
+used_lines = [{'wavelength': 3650.158, 'line_strength': 0.0556, 'line_source': 'Hg', 'line_notes': ''},
               {'wavelength': 3654.842, 'line_strength': '', 'line_source': 'Hg', 'line_notes': ''},
-              {'wavelength': 4046.565, 'line_strength': 0.3072, 'line_source': 'Hg', 'line_notes': ''},
-              {'wavelength': 4077.837, 'line_strength': 0.026, 'line_source': 'Hg', 'line_notes': ''},
-              {'wavelength': 4358.335, 'line_strength': 1.0, 'line_source': 'Hg', 'line_notes': ''},
+              {'wavelength': 4046.565, 'line_strength': 0.0659, 'line_source': 'Hg', 'line_notes': ''},
+              {'wavelength': 4077.837, 'line_strength': 0.0056, 'line_source': 'Hg', 'line_notes': ''},
+              {'wavelength': 4358.335, 'line_strength': 0.2147, 'line_source': 'Hg', 'line_notes': ''},
               {'wavelength': 5460.75, 'line_strength': 0.8311, 'line_source': 'Hg', 'line_notes': ''},
+              {'wavelength': 5460.75, 'line_strength': 0.1784, 'line_source': 'Hg', 'line_notes': 'Found in both Red/Blue Orders'},
+              {'wavelength': 5769.61, 'line_strength': 0.0296, 'line_source': 'Hg', 'line_notes': ''},
+              {'wavelength': 5790.67, 'line_strength': '', 'line_source': 'Hg', 'line_notes': 'Blend?'},
+              {'wavelength': 6416.307, 'line_strength': '', 'line_source': 'ArI', 'line_notes': ''},
+              {'wavelength': 6677.282, 'line_strength': 0.0017, 'line_source': 'ArI', 'line_notes': ''},
+              {'wavelength': 6752.8335, 'line_strength': '', 'line_source': 'ArI', 'line_notes': ''},
+              {'wavelength': 6871.2891, 'line_strength': '', 'line_source': 'ArI', 'line_notes': ''},
+              {'wavelength': 6965.4307, 'line_strength': 0.2379, 'line_source': 'ArI', 'line_notes': ''},
+              {'wavelength': 7067.2175, 'line_strength': 0.0694, 'line_source': 'ArI', 'line_notes': ''},
+              {'wavelength': 7147.0416, 'line_strength': 0.0113, 'line_source': 'ArI', 'line_notes': ''},
+              {'wavelength': 7272.9359, 'line_strength': 0.0599, 'line_source': 'ArI', 'line_notes': ''},
+              {'wavelength': 7635.1056, 'line_strength': 0.988, 'line_source': 'ArI', 'line_notes': ''},
+              {'wavelength': 7948.1764, 'line_strength': 0.1968, 'line_source': 'ArI', 'line_notes': ''},
+              {'wavelength': 8264.5225, 'line_strength': 0.3103, 'line_source': 'ArI', 'line_notes': ''},
+              {'wavelength': 8521.4422, 'line_strength': 0.1409, 'line_source': 'ArI', 'line_notes': ''},
+              {'wavelength': 8667.9442, 'line_strength': 0.0321, 'line_source': 'ArI', 'line_notes': ''},
+              {'wavelength': 9122.9674, 'line_strength': 1.0, 'line_source': 'ArI', 'line_notes': ''},
+              {'wavelength': 9224.4992, 'line_strength': 0.1173, 'line_source': 'ArI', 'line_notes': ''},
+              {'wavelength': 9657.7863, 'line_strength': 0.151, 'line_source': 'ArI', 'line_notes': ''},
+              {'wavelength': 9784.5028, 'line_strength': 0.0063, 'line_source': 'ArI', 'line_notes': ''},
+              {'wavelength': 10139.75, 'line_strength': 0.005, 'line_source': 'Hg', 'line_notes': ''},
+              {'wavelength': 10470.054, 'line_strength': '', 'line_source': 'ArI', 'line_notes': ''}
               ]
 
-red_lines = [{'wavelength': 5460.75, 'line_strength': 0.1784, 'line_source': 'Hg', 'line_notes': ''},
-             {'wavelength': 5769.61, 'line_strength': 0.0296, 'line_source': 'Hg', 'line_notes': ''},
-             {'wavelength': 5790.67, 'line_strength': '', 'line_source': 'Hg', 'line_notes': 'Blend?'},
-             {'wavelength': 6416.307, 'line_strength': '', 'line_source': 'ArI', 'line_notes': ''},
-             {'wavelength': 6677.282, 'line_strength': 0.0017, 'line_source': 'ArI', 'line_notes': ''},
-             {'wavelength': 6752.8335, 'line_strength': '', 'line_source': 'ArI', 'line_notes': ''},
-             {'wavelength': 6871.2891, 'line_strength': '', 'line_source': 'ArI', 'line_notes': ''},
-             {'wavelength': 6965.4307, 'line_strength': 0.2379, 'line_source': 'ArI', 'line_notes': ''},
-             {'wavelength': 7067.2175, 'line_strength': 0.0694, 'line_source': 'ArI', 'line_notes': ''},
-             {'wavelength': 7147.0416, 'line_strength': 0.0113, 'line_source': 'ArI', 'line_notes': ''},
-             {'wavelength': 7272.9359, 'line_strength': 0.0599, 'line_source': 'ArI', 'line_notes': ''},
-             {'wavelength': 7635.1056, 'line_strength': 0.988, 'line_source': 'ArI', 'line_notes': ''},
-             {'wavelength': 7948.1764, 'line_strength': 0.1968, 'line_source': 'ArI', 'line_notes': ''},
-             {'wavelength': 8264.5225, 'line_strength': 0.3103, 'line_source': 'ArI', 'line_notes': ''},
-             {'wavelength': 8521.4422, 'line_strength': 0.1409, 'line_source': 'ArI', 'line_notes': ''},
-             {'wavelength': 8667.9442, 'line_strength': 0.0321, 'line_source': 'ArI', 'line_notes': ''},
-             {'wavelength': 9122.9674, 'line_strength': 1.0, 'line_source': 'ArI', 'line_notes': ''},
-             {'wavelength': 9224.4992, 'line_strength': 0.1173, 'line_source': 'ArI', 'line_notes': ''},
-             {'wavelength': 9657.7863, 'line_strength': 0.151, 'line_source': 'ArI', 'line_notes': ''},
-             {'wavelength': 9784.5028, 'line_strength': 0.0063, 'line_source': 'ArI', 'line_notes': ''},
-             {'wavelength': 10139.75, 'line_strength': 0.005, 'line_source': 'Hg', 'line_notes': ''},
-             {'wavelength': 10470.054, 'line_strength': '', 'line_source': 'ArI', 'line_notes': ''}
-             ]
-
 unused_lines = [{'wavelength': 3451.689, 'line_strength': '', 'line_source': 'Hg', 'line_notes': 'No flux in FLOYDS'},
-                {'wavelength': 3663.2793, 'line_strength': 0.0299, 'line_source': 'Hg', 'line_notes': 'blend'},
+                {'wavelength': 3663.2793, 'line_strength': 0.0064, 'line_source': 'Hg', 'line_notes': 'blend'},
                 {'wavelength': 4339.2232, 'line_strength': '', 'line_source': 'Hg', 'line_notes': 'Weak line'},
                 {'wavelength': 4347.5, 'line_strength': '', 'line_source': 'Hg', 'line_notes': 'Weak line'},
                 {'wavelength': 4916.068, 'line_strength': '', 'line_source': 'Hg', 'line_notes': 'Weak line'},

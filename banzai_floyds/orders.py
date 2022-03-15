@@ -28,6 +28,10 @@ class Orders:
     def coeffs(self):
         return [model.coef for model in self._models]
 
+    @property
+    def domains(self):
+        return [model.domain for model in self._models]
+
 
 def tophat_filter_metric(data, error, region):
     # This is adapted from Zackay et al. 2017
@@ -182,7 +186,7 @@ class OrderSolver(Stage):
     ORDER_HEIGHT = 93
     CENTER_CUT_WIDTH = 31
     POLYNOMIAL_ORDER = 3
-    ORDER_REGIONS = [(0, 1775), (450, 1975)]
+    ORDER_REGIONS = [(0, 1600), (475, 1975)]
 
     def do_stage(self, image):
         if image.orders is None:
@@ -200,21 +204,31 @@ class OrderSolver(Stage):
                                                  order_center, image.data.shape[1] // 2)
                 good_region = np.logical_and(x >= self.ORDER_REGIONS[i][0], x <= self.ORDER_REGIONS[i][1])
                 initial_model = Legendre.fit(deg=self.POLYNOMIAL_ORDER, x=x[good_region],
-                                             y=order_locations[good_region], domain=(0, image.data.shape[1]))
-                initial_guesses.append(initial_model.coef)
+                                             y=order_locations[good_region],
+                                             domain=(self.ORDER_REGIONS[i][0], self.ORDER_REGIONS[i][1]))
+                initial_guesses.append((initial_model.coef, initial_model.domain))
         else:
             # Load from previous solve
-            initial_guesses = image.orders.coeffs
+            initial_guesses = [(coeff, domain) for coeff, domain in zip(image.orders.coeffs, image.orders.domains)]
         # Do a fit to get the curvature of the slit
-        image.orders = Orders([fit_order_curve(image.data, image.uncertainty, self.ORDER_HEIGHT, guess)
-                               for guess in initial_guesses], image.data.shape, self.ORDER_HEIGHT)
+        order_curves = []
+        for i, (coeff, domain) in enumerate(initial_guesses):
+            domain_slice = slice(int(domain[0]), int(domain[1] + 1))
+            order_curve = fit_order_curve(image.data[:, domain_slice], image.uncertainty[:, domain_slice],
+                                          self.ORDER_HEIGHT, coeff)
+            order_curve.domain = domain
+            order_curves.append(order_curve)
+        image.orders = Orders(order_curves, image.data.shape, self.ORDER_HEIGHT)
         image.add_or_update(ArrayData(image.orders.data, name='ORDERS'))
         coeff_table = [{f'c{i}': coeff for i, coeff in enumerate(coefficient_set)}
                        for coefficient_set in image.orders.coeffs]
         for i, row in enumerate(coeff_table):
             row['order'] = i + 1
+            row['domainmin'], row['domainmax'] = image.orders.domains[i]
         coeff_table = Table(coeff_table)
         coeff_table['order'].description = 'ID of order'
+        coeff_table['domainmin'].description = 'Domain minimum for the order curve'
+        coeff_table['domainmax'].description = 'Domain maximum for the order curve'
         for i in range(self.POLYNOMIAL_ORDER + 1):
             coeff_table[f'c{i}'].description = f'Coefficient for P_{i}'
 

@@ -129,5 +129,5 @@ def maximize_match_filter(initial_guess, data, error, weight_function, x, weight
                             args=(data, error, weight_function, weights_jacobian_function, weights_hessian_function,
                                   x, *args),
                             method='Newton-CG', hess=lambda *params: -matched_filter_hessian(*params),
-                            jac=lambda *params: -matched_filter_jacobian(*params))
+                            jac=lambda *params: -matched_filter_jacobian(*params), options={'eps': 1e-5})
     return best_fit.x

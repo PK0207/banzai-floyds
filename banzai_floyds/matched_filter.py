@@ -1,46 +1,176 @@
+"""
+This whole framework is adapted from Zackay et al. 2017, ApJ, 836, 187
+https://ui.adsabs.harvard.edu/abs/2017ApJ...836..187Z/abstract
+"""
 import numpy as np
 from scipy.optimize import minimize
 
-# This whole framework is adapted from Zackay et al. 2017
-
 
 def matched_filter_signal(data, error, weights):
+    """
+    Calculate the matched filter signal given a set of weights
+    S = Σ d w / σ²
+
+    Parameters
+    ----------
+    data: array: data to compare to the match filter
+    error: array: uncertainty array
+    weights: array: match filter array
+
+    Returns
+    -------
+    float: matched filter signal
+
+    Notes
+    -----
+    The data, error, and weights array all need to be the same shape. The signal here is equivalent to a matched filter
+    correlation and is also equivalent to a weighted sum of independent measurements with Gaussian uncertainties σ.
+    """
     return (data * weights / error / error).sum()
 
 
 def matched_filter_normalization(error, weights):
+    """
+    Calculate the normalization for the matched filter metric. This is the noise (sqrt of the variance) on the matched
+    filter signal.
+
+    Parameters
+    ----------
+    error: array of uncertainties, should be the same shape as the input data
+    weights: array of match filter weights, should be the same shape as the input data
+
+    Returns
+    -------
+    float: normalization value for the matched filter metric
+
+    Notes
+    -----
+    Note that the normalization includes the square of the weights. The propagation of uncertainty for a weighted
+    sum of independent measurements is variance = Σ (w / σ²)² σ² =  Σ w² / σ²
+
+    """
     return ((weights * weights / error / error).sum()) ** 0.5
 
 
-def matched_filter_metric(theta, data, error, weight_function, weights_jacobian_function,
+def matched_filter_metric(theta, data, error, weights_function, weights_jacobian_function,
                           weights_hessian_function, x, *args):
-    weights = weight_function(theta, x, *args)
+    """
+    Calculate the matched filter metric to optimize your model. This is the matched filter signal / the sqrt of
+    the variance of the matched filter signal (S/N)
+
+    Parameters
+    ----------
+    theta: array of input values for the parameters of the weights function that in principle can be varied
+           using scipy.optimize.minimize
+    data: array of the data to match filter
+    error: array of uncertainties, should be the same size as the data array
+    weights_function: callable function to calculate the match filter weights. Should return an array the same shape as
+                     input data.
+    weights_jacobian_function: Not used in this function. This is only included here because scipy.minimize.optimize
+                               passes the same arguments to jacobian and hessian functions.
+    weights_hessian_function: Not used in this function. This is only included here because scipy.minimize.optimize
+                              passes the same arguments to jacobian and hessian functions.
+    x: tuple of arrays independent variables x, y. Arrays should be the same shape as the input data
+    args: tuple of any other static arguments that should be passed to the weights function.
+
+    Returns
+    -------
+    float: signal-to-noise metric for the matched filter
+    """
+    weights = weights_function(theta, x, *args)
     metric = matched_filter_signal(data, error, weights)
     metric /= matched_filter_normalization(error, weights)
     return metric
 
 
 def matched_filter_signal_jacobian(theta, x, data, error, weights_jacobian_function, *args):
+    """
+    Calculate the jacobian of the numerator of the match filter metric
+
+    Parameters
+    ----------
+    theta: array of input values for the parameters of the weights function that in principle can be varied
+           using scipy.optimize.minimize
+    x: tuple of arrays independent variables x, y. Arrays should be the same shape as the input data
+    data: array of the data to match filter
+    error: array of uncertainties, should be the same size as the data array    x
+    weights_jacobian_function: callable function to calculate the ith component of the jacobian given the parameters
+                               should return an array that is the same shape as data
+    args: tuple of any other static arguments that should be passed to the weights function.
+
+    Returns
+    -------
+    1-d array of the jacobians for each parameter in theta
+
+    Notes
+    -----
+    ∂ⱼS = Σ ( D ∂ⱼw / σ²)
+    """
     return np.array([(weights_jacobian_function(theta, x, i, *args) * data / error / error).sum()
                      for i in range(len(theta))])
 
 
 def matched_filter_normalization_jacobian(theta, x, weights, error, weights_jacobian_function, normalization, *args):
-    # n' = sum weights * weights'/ sigma^2 / n
+    """
+    Calculate the jacobian of the denominator of the match filter metric (sqrt(variance))
+
+    Parameters
+    ----------
+    theta: array of input values for the parameters of the weights function that in principle can be varied
+           using scipy.optimize.minimize
+    x: tuple of arrays independent variables x, y. Arrays should be the same shape as the input data
+    weights: array of match filter weights, should be the same shape as the input data
+    error: array of uncertainties, should be the same size as the data array
+    weights_jacobian_function: callable function to calculate the ith component of the jacobian given the parameters
+                               should return an array that is the same shape as data
+    normalization: precalculated value of the original normalization using the weights function
+    args: tuple of any other static arguments that should be passed to the weights function.
+
+    Returns
+    -------
+    1-d array of the jacobians for the normalization for each parameter in theta
+
+    Notes
+    -----
+    ∂ⱼN = Σ (w ∂ⱼw / σ²) / N²
+    """
     return np.array([(weights * weights_jacobian_function(theta, x, i, *args) / error / error).sum() / normalization
                      for i in range(len(theta))])
 
 
 def matched_filter_jacobian(theta, data, error, weights_function, weights_jacobian_function,
                             weights_hessian_function, x, *args):
-    # First derivative of the matched filter metric
-    # metric is s / n
-    # jacobian is (n s' - s n') / n^2
+    """
+    Calculate the derivative of the match filter metric S/N by combining the derivatives of the numerator and
+    denominator.
+
+    Parameters
+    ----------
+    theta: array of input values for the parameters of the weights function that in principle can be varied
+           using scipy.optimize.minimize
+    data: array of the data to match filter
+    error: array of uncertainties, should be the same size as the data array    x
+    weights_functions: callable function to calculate the match filter weights. Should return an array the same shape as
+                      input data.
+    weights_jacobian_function: callable function to calculate the ith component of the jacobian given the parameters
+                               should return an array that is the same shape as data
+    weights_hessian_function: Not used in this function. This is only included here because scipy.minimize.optimize
+                              passes the same arguments to jacobian and hessian functions.
+    x: tuple of arrays independent variables x, y. Arrays should be the same shape as the input data
+    args: tuple of any other static arguments that should be passed to the weights function.
+
+    Returns
+    -------
+    1-d array of the jacobians for the matched filter metric S/N for each parameter in theta
+
+    Notes
+    -----
+    jacobian = (N ∂ⱼS - S ∂ⱼN) / N²
+    """
     weights = weights_function(theta, x, *args)
     normalization = matched_filter_normalization(error, weights)
     signal = matched_filter_signal(data, error, weights)
 
-    # s' = sum Weights' data / error^2
     signal_jacobian = matched_filter_signal_jacobian(theta, x, data, error, weights_jacobian_function, *args)
 
     normalization_jacobian = matched_filter_normalization_jacobian(theta, x, weights, error, weights_jacobian_function,
@@ -50,7 +180,33 @@ def matched_filter_jacobian(theta, data, error, weights_function, weights_jacobi
 
 def matched_filter_hessian(theta, data, error, weights_function, weights_jacobian_function, weights_hessian_function, x,
                            *args):
-    # The Hessian is n⁻⁴ (n² (∂ⱼn ∂ᵢs + n ∂ⱼ∂ᵢs -s ∂ⱼ∂ᵢn - ∂ᵢn ∂ⱼs) - 2 n ∂ⱼn (n ∂ᵢs - s ∂ᵢn))
+    """
+    Calculate the hessian matrix of i,j second partial derivatives to use for optimization
+
+    Parameters
+    ----------
+    theta: array of input values for the parameters of the weights function that in principle can be varied
+           using scipy.optimize.minimize
+    data: array of the data to match filter
+    error: array of uncertainties, should be the same size as the data array    x
+    weights_functions: callable function to calculate the match filter weights. Should return an array the same shape as
+                       input data.
+    weights_jacobian_function: callable function to calculate the ith component of the jacobian given the parameters
+                               should return an array that is the same shape as data
+    weights_hessian_function: callable function to calculate the i,j component of the hessian of the weights.
+                              should return an array that is the same shape as data
+    x: tuple of arrays independent variables x, y. Arrays should be the same shape as the input data
+    args: tuple of any other static arguments that should be passed to the weights function.
+
+    Returns
+    -------
+    2-d array of the Hessian i,j of second derivatives. Shape is square with each dimension being the number of free
+    parameters in theta.
+
+    Notes
+    -----
+    The Hessian is n⁻⁴ (n² (∂ⱼn ∂ᵢs + n ∂ⱼ∂ᵢs -s ∂ⱼ∂ᵢn - ∂ᵢn ∂ⱼs) - 2 n ∂ⱼn (n ∂ᵢs - s ∂ᵢn))
+    """
     weights = weights_function(theta, x, *args)
     signal = matched_filter_signal(data, error, weights)
     normalization = matched_filter_normalization(error, weights)
@@ -113,20 +269,46 @@ def matched_filter_hessian(theta, data, error, weights_function, weights_jacobia
     return filter_hessian
 
 
-def maximize_match_filter(initial_guess, data, error, weight_function, x, weights_jacobian_function=None,
-                          weights_hessian_function=None,  args=None):
+def maximize_match_filter(initial_guess, data, error, weights_function, x, weights_jacobian_function=None,
+                          weights_hessian_function=None, args=None):
+    """
+    Find the best fit parameters for a match filter model
+
+    Parameters
+    ----------
+    initial_guess: array of initial values for the model parameters to be fit
+    data: array of data to match filter
+    error: array of uncertainties, should be the same shape as data
+    weight_functions: callable function to calculate the match filter weights. Should return an array the same shape as
+                      input data.
+    x: tuple of arrays independent variables x, y. Arrays should be the same shape as the input data
+    weights_jacobian_function: optional: callable function to calculate the ith component of the jacobian given the parameters
+                               should return an array that is the same shape as data
+    weights_hessian_function: optional: callable function to calculate the i,j component of the hessian of the weights.
+                              should return an array that is the same shape as data
+    args: tuple of any other static arguments that should be passed to the weights function.
+
+    Returns
+    -------
+    array of best fit parameters for the model
+
+    Notes
+    -----
+    Depending on if the Jacbian and Hessian functions are included, we choose our minimization algorithm based on this:
+    https://scipy-lectures.org/advanced/mathematical_optimization/#choosing-a-method
+    """
     if weights_hessian_function is None and weights_jacobian_function is None:
         best_fit = minimize(lambda *params: -matched_filter_metric(*params), initial_guess,
-                            args=(data, error, weight_function, weights_jacobian_function, weights_hessian_function, x,
+                            args=(data, error, weights_function, weights_jacobian_function, weights_hessian_function, x,
                                   *args), method='Powell')
     elif weights_hessian_function is None:
         best_fit = minimize(lambda *params: -matched_filter_metric(*params), initial_guess,
-                            args=(data, error, weight_function, weights_jacobian_function, weights_hessian_function, x,
+                            args=(data, error, weights_function, weights_jacobian_function, weights_hessian_function, x,
                                   *args),
                             method='BFGS', jac=lambda *params: -matched_filter_jacobian(*params))
     else:
         best_fit = minimize(lambda *params: -matched_filter_metric(*params), initial_guess,
-                            args=(data, error, weight_function, weights_jacobian_function, weights_hessian_function,
+                            args=(data, error, weights_function, weights_jacobian_function, weights_hessian_function,
                                   x, *args),
                             method='Newton-CG', hess=lambda *params: -matched_filter_hessian(*params),
                             jac=lambda *params: -matched_filter_jacobian(*params), options={'eps': 1e-5})

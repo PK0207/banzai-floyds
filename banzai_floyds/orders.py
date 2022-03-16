@@ -13,12 +13,26 @@ from banzai_floyds.matched_filter import maximize_match_filter
 
 class Orders:
     def __init__(self, models, image_shape, order_height):
+        """
+        A set of order curves to use to get the pixels with light in them.
+
+        Parameters
+        ----------
+        models: list of Polynomalial objects
+        image_shape: tuple of integers (y, x) size
+        order_height: integer height of the order in pixels
+        """
         self._models = models
         self._image_shape = image_shape
         self._order_height = order_height
 
     @property
     def data(self):
+        """
+        Returns
+        -------
+        Array with each order numbered starting with 1
+        """
         order_data = np.zeros(self._image_shape, dtype=np.uint8)
         for i, model in enumerate(self._models):
             order_data[order_region(self._order_height, model, self._image_shape)] = i + 1
@@ -26,33 +40,72 @@ class Orders:
 
     @property
     def coeffs(self):
+        """
+        Returns
+        -------
+        List of coefficients for each model
+        """
         return [model.coef for model in self._models]
 
     @property
     def domains(self):
+        """
+        Returns
+        -------
+        List of tuples with the min/max of fit domain
+        """
         return [model.domain for model in self._models]
 
 
 def tophat_filter_metric(data, error, region):
-    # This is adapted from Zackay et al. 2017
+    """
+    Calculate the metric for a top-hat function that uses an integer number of pixels
+
+    Parameters
+    ----------
+    data: array
+    error: array
+    region: array of booleans
+
+    Notes
+    -----
+    This is adapted from Zackay et al. 2017
+
+    Returns
+    -------
+    float: Metric of the likelihood for the matched top-hat filter
+    """
     metric = (data[region] / error[region] / error[region]).sum()
     metric /= ((1.0 / error[region] / error[region]).sum()) ** 0.5
     return metric
 
 
-def smooth_order_weights(params, x, height):
+def smooth_order_weights(params, x, height, k=2):
+    """
+    A smooth analytic function implementation of the top hat function
+
+    Parameters
+    ----------
+    params: array of floats: coefficients of the Legendre polynomial that describes the center of the order
+    x: tuple of arrays independent variables x, y. Arrays should be the same shape as the input data
+    height: Number of pixels in the top of the hat
+    k: float: sharpness parameter of the edges of the top-hat
+
+    Returns
+    -------
+    array of weights
+
+    Notes
+    -----
+    We implement a smoothed filter so the edges aren't so sharp. Use two logistic functions for each of the edges.
+    We have to add a half to each side of the filter so that the edges are at the edges of pixels as the center of
+    the pixels are the integer coordinates. We use the expit function provided by scipy throughout because it is better
+    numerically behaved that simple implementations we can do ourselves (fewer overflow warnings).
+    """
     x2d, y2d = x
     model = Legendre(params, domain=(np.min(x2d), np.max(x2d)))
-
     y_centers = model(x2d)
 
-    # We Implement a smoothed filter so the edges aren't so sharp. Use two logistic functions for each of the edges
-    # Note the normalization will need a square of the weights / sigma^2. This is due to combining uncertainty
-    # propagation for a weighted sum w^2 sigma^2 (the w = filter / sigma^2 so one pair of the sigmas cancel)
-    # Note the minus sign for the top of the filter. This flips the logistic function. This means that x0 also has to
-    # flip signs. We also have to add a half to each side of the filter so that the edges are at the edges of pixels
-    # as the center of the pixels are the integer coordinates
-    k = 2
     half_height = height // 2 + 0.5
     weights = expit(k * (y2d - y_centers + half_height))
     weights *= expit(k * (-y2d + y_centers + half_height))
@@ -60,17 +113,35 @@ def smooth_order_weights(params, x, height):
 
 
 def smooth_order_jacobian(theta, x, i, height, k=2):
+    """
+    Calculate the the ith partial derivatives of the smooth top-hat weights
+
+    Parameters
+    ----------
+    theta: array of floats: coefficients of the Legendre polynomial that describes the center of the order
+    x: tuple of arrays independent variables x, y. Arrays should be the same shape as the input data
+    i: int: index of the coefficient to take a partial derivative with respect to
+    height: Number of pixels in the top of the hat
+    k: float: sharpness parameter of the edges of the top-hat
+
+    Returns
+    -------
+    array of ith partial derivative of the smooth top-hat weights, same shape as the input data
+
+    Notes
+    -----
+    h = half_height
+    Note we have used the Einstein summation notation
+    weights = w = σ(y - cᵢ Pᵢ(x) + h) σ(-y + cᵢ Pᵢ(x) + h)
+    use σ' = σ (1 - σ)
+    Note the minus signs come from when the polynomials are added or subtracted
+    ∂ⱼw = -k Pⱼ(x) σ(y - cᵢ Pᵢ(x) + h) (1 - σ(y - cᵢ Pᵢ(x) + h)) σ(-y + cᵢ Pᵢ(x) + h) + \
+          + k Pⱼ(x) σ(y - cᵢ Pᵢ(x) + h) σ(-y + cᵢ Pᵢ(x) + h) (1 - σ(-y + cᵢ Pᵢ(x) + h))
+    ∂ⱼw = k Pⱼ(x) σ(y - cᵢ Pᵢ(x) + h) σ(-y + cᵢ Pᵢ(x) + h) (σ(y - cᵢ Pᵢ(x) + h) - σ(-y + cᵢ Pᵢ(x) + h))
+    """
     x2d, y2d = x
     model = Legendre(theta, domain=(np.min(x2d), np.max(x2d)))
-    # We need the first derivative of the sigmoid function
-    # h = half_height
-    # Note we have used the Einstein summation notation
-    # weights = w = σ(y - cᵢ Pᵢ(x) + h) σ(-y + cᵢ Pᵢ(x) + h)
-    # use σ' = σ (1 - σ)
-    # Note the minus signs come from when the polynomials are added or subtracted
-    # ∂ⱼw = -k Pⱼ(x) σ(y - cᵢ Pᵢ(x) + h) (1 - σ(y - cᵢ Pᵢ(x) + h)) σ(-y + cᵢ Pᵢ(x) + h) + \
-    # + k Pⱼ(x) σ(y - cᵢ Pᵢ(x) + h) σ(-y + cᵢ Pᵢ(x) + h) (1 - σ(-y + cᵢ Pᵢ(x) + h))
-    # ∂ⱼw = k Pⱼ(x) σ(y - cᵢ Pᵢ(x) + h) σ(-y + cᵢ Pᵢ(x) + h) (σ(y - cᵢ Pᵢ(x) + h) - σ(-y + cᵢ Pᵢ(x) + h))
+
     half_height = height // 2 + 0.5
     y_centers = model(x2d)
     polynomial_i = model.basis(i, domain=(np.min(x2d), np.max(x2d)))(x2d)
@@ -80,10 +151,30 @@ def smooth_order_jacobian(theta, x, i, height, k=2):
 
 
 def smooth_order_hessian(theta, x, i, j, height, k=2):
-    # σ+ = (y - cᵢ Pᵢ(x) + h)
-    # σ- = σ(-y + cᵢ Pᵢ(x) + h)
-    # ∂ᵢ∂ⱼw = k² Pᵢ Pⱼ (σ+ σ- (1 - σ-) (σ+ - σ-) - σ- σ+ (1 - σ+) (σ+ - σ-) - σ- σ+ (σ- (1 - σ-) + σ+ (1 - σ+)))
-    # ∂ᵢ∂ⱼw = k² Pᵢ Pⱼ σ+ σ- ((σ+ - σ-)² +  σ+ (σ+ - 1) + σ- (σ- - 1))
+    """
+    Calculate i,j component of the Hessian matrix of second derivatives of the smooth top-hat weights
+
+    Parameters
+    ----------
+    array of floats: coefficients of the Legendre polynomial that describes the center of the order
+    x: tuple of arrays independent variables x, y. Arrays should be the same shape as the input data
+    i: int: index of the coefficient to take the first partial derivative with respect to
+    j: int: index of the coefficient to take the second partial derivative with respect to
+    height: Number of pixels in the top of the hat
+    k: float: sharpness parameter of the edges of the top-hat
+
+    Returns
+    -------
+    array of i, j second partial derivative of the smooth top-hat weights, same shape as the input data
+
+    Notes
+    ------
+    σ+ = (y - cᵢ Pᵢ(x) + h)
+    σ- = σ(-y + cᵢ Pᵢ(x) + h)
+    ∂ᵢ∂ⱼw = k² Pᵢ Pⱼ (σ+ σ- (1 - σ-) (σ+ - σ-) - σ- σ+ (1 - σ+) (σ+ - σ-) - σ- σ+ (σ- (1 - σ-) + σ+ (1 - σ+)))
+    ∂ᵢ∂ⱼw = k² Pᵢ Pⱼ σ+ σ- ((σ+ - σ-)² +  σ+ (σ+ - 1) + σ- (σ- - 1))
+    """
+
     x2d, y2d = x
     model = Legendre(theta, domain=(np.min(x2d), np.max(x2d)))
     half_height = height // 2 + 0.5
@@ -98,6 +189,19 @@ def smooth_order_hessian(theta, x, i, j, height, k=2):
 
 
 def order_region(order_height, center, image_size):
+    """
+    Get an order mask to get the pixels inside the order
+
+    Parameters
+    ----------
+    order_height: int: Number of pixels in the top of the hat
+    center: callable model function that describes the center of the order, must have a domain property
+    image_size: tuple of ints, shape of the input/output arrays
+
+    Returns
+    -------
+    array of booleans, True where pixels are part of the order
+    """
     x = np.arange(image_size[1])
     y_centers = np.round(center(x)).astype(int)
     x2d, y2d = np.meshgrid(np.arange(image_size[1]), np.arange(image_size[0]))
@@ -110,6 +214,21 @@ def order_region(order_height, center, image_size):
 
 
 def estimate_order_centers(data, error, order_height, peak_separation=10, min_signal_to_noise=100.0):
+    """
+    Estimate the order centers by finding peaks using a simple cross correlation style sliding window metric
+
+    Parameters
+    ----------
+    data: array: data to search for orders, often a central slice of the full dataset
+    error: array: error array, same shape as the passed data
+    order_height: int: Number of pixels in the top of the hat
+    peak_separation: float: minimum distance between real peaks
+    min_signal_to_noise: float: Minimium value of the signal/noise metric to return in the list of peaks
+
+    Returns
+    -------
+    array of ints with peaks of the matched filter metric
+    """
     matched_filtered = np.zeros(data.shape[0])
     for i in np.arange(data.shape[0]):
         # Run a matched filter using a top hat filter
@@ -124,6 +243,20 @@ def estimate_order_centers(data, error, order_height, peak_separation=10, min_si
 
 
 def fit_order_curve(data, error, order_height, initial_guess):
+    """
+    Maximize the matched filter metric to find the best fit order curvature and location
+
+    Parameters
+    ----------
+    data: array to fit order
+    error: array of uncertainties, same shapes as the input data array
+    order_height: int: Number of pixels in the top of the hat
+    initial_guess: array of initial guesses for the Legendre polynomial coefficients of the center of the order
+
+    Returns
+    -------
+    Polynomial model function of the best fit
+    """
     x = np.meshgrid(np.arange(data.shape[1]), np.arange(data.shape[0]))
     best_fit_params = maximize_match_filter(initial_guess, data, error, smooth_order_weights, x,
                                             weights_jacobian_function=smooth_order_jacobian,
@@ -134,6 +267,24 @@ def fit_order_curve(data, error, order_height, initial_guess):
 
 def trace_order(data, error, order_height, initial_center, initial_center_x,
                 step_size=11, filter_width=21, search_height=7):
+    """
+    Trace an order by stepping a window function along from the center of the chip
+
+    Parameters
+    ----------
+    data: array to trace order
+    error: array of uncertainties, same shapes as the input data array
+    order_height: int: Number of pixels in the top of the hat
+    initial_center: int: Starting guess for y value of the center of the order
+    initial_center_x: int: x-coordinate for the starting y-value guess
+    step_size: int: number of pixels to step between each estimate of the trace center
+    filter_width: int: x-width of the filter to sum to search for peaks in the metric
+    search_height: int: number of pixels to search above and below the previous best center
+
+    Returns
+    -------
+    array, array: x coordinates for each step, peak y for each step
+    """
     centers = []
     xs = []
     # keep stepping until you get to the edge of the chip
@@ -165,6 +316,9 @@ def trace_order(data, error, order_height, initial_center, initial_center_x,
 
 
 class OrderLoader(CalibrationUser):
+    """
+    A stage to load previous order fits from sky flats
+    """
     def on_missing_master_calibration(self, image):
         if image.obstype == 'SKYFLAT':
             return image
@@ -181,6 +335,10 @@ class OrderLoader(CalibrationUser):
 
 
 class OrderSolver(Stage):
+    """
+    A stage to map out the orders on sky flats. This would in principle work on lamp filters that do not have the
+    dichroic as well but needs good signal to noise to get the curvature to converge well.
+    """
     # Currently we hard code the order height to 93. If we wanted to measure it I recommend using a Canny filter and
     # taking the edge closest to the previous guess of the edge.
     ORDER_HEIGHT = 93

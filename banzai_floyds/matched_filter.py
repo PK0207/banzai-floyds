@@ -282,8 +282,8 @@ def maximize_match_filter(initial_guess, data, error, weights_function, x, weigh
     weight_functions: callable function to calculate the match filter weights. Should return an array the same shape as
                       input data.
     x: tuple of arrays independent variables x, y. Arrays should be the same shape as the input data
-    weights_jacobian_function: optional: callable function to calculate the ith component of the jacobian given the parameters
-                               should return an array that is the same shape as data
+    weights_jacobian_function: optional: callable function to calculate the ith component of the jacobian given
+                               the parameters should return an array that is the same shape as data
     weights_hessian_function: optional: callable function to calculate the i,j component of the hessian of the weights.
                               should return an array that is the same shape as data
     args: tuple of any other static arguments that should be passed to the weights function.

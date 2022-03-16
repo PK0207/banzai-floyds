@@ -12,7 +12,6 @@ used_lines = [{'wavelength': 3650.158, 'line_strength': 0.0556, 'line_source': '
               {'wavelength': 4046.565, 'line_strength': 0.0659, 'line_source': 'Hg', 'line_notes': ''},
               {'wavelength': 4077.837, 'line_strength': 0.0056, 'line_source': 'Hg', 'line_notes': ''},
               {'wavelength': 4358.335, 'line_strength': 0.2147, 'line_source': 'Hg', 'line_notes': ''},
-              {'wavelength': 5460.75, 'line_strength': 0.8311, 'line_source': 'Hg', 'line_notes': ''},
               {'wavelength': 5460.75, 'line_strength': 0.1784, 'line_source': 'Hg', 'line_notes': 'Found in both Red/Blue Orders'},
               {'wavelength': 5769.61, 'line_strength': 0.0296, 'line_source': 'Hg', 'line_notes': ''},
               {'wavelength': 5790.67, 'line_strength': '', 'line_source': 'Hg', 'line_notes': 'Blend?'},

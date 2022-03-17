@@ -313,7 +313,7 @@ def maximize_match_filter(initial_guess, data, error, weights_function, x, weigh
     data: array of data to match filter
     error: array of uncertainties
         Should be the same shape as data
-    weight_functions: callable function
+    weights_function: callable function
         Function to calculate the match filter weights
         Should return an array the same shape as input data.
     x: tuple of arrays independent variables x, y

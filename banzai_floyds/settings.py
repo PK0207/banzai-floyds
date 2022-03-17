@@ -1,10 +1,9 @@
 from banzai.settings import *  # noqa: F401,F403
 
-ORDERED_STAGES = [
-                  'banzai.bias.OverscanSubtractor',
+ORDERED_STAGES = ['banzai.bias.OverscanSubtractor',
                   'banzai.trim.Trimmer',
-                  'banzai_floyds.orders.OrderLoader'
-                  ]
+                  'banzai.uncertainty.PoissonInitializer',
+                  'banzai_floyds.orders.OrderLoader']
 
 FRAME_SELECTION_CRITERIA = [('type', 'contains', 'FLOYDS')]
 

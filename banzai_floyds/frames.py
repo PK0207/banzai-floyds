@@ -47,7 +47,8 @@ class FLOYDSFrameFactory(LCOFrameFactory):
             polynomial_order = image['ORDER_COEFFS'].meta['POLYORD']
             coeffs = [np.array([row[f'c{i}'] for i in range(polynomial_order + 1)])
                       for row in image['ORDER_COEFFS'].data]
-            models = [np.polynomial.legendre.Legendre(coeff_set, domain=(0, image.data.shape[1] - 1))
-                      for coeff_set in coeffs]
+            domains = [(row['domainmin'], row['domainmax']) for row in image['ORDER_COEFFS'].data]
+            models = [np.polynomial.legendre.Legendre(coeff_set, domain=domain)
+                      for coeff_set, domain in zip(coeffs, domains)]
             image.orders = Orders(models, image.data.shape, image['ORDER_COEFFS'].meta['HEIGHT'])
         return image

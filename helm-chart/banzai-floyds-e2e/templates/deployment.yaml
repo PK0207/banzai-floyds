@@ -112,17 +112,17 @@ spec:
             limits:
               cpu: "4"
               memory: "8Gi"
-        readinessProbe:
-          exec:
-            command:
-              - celery
-              - inspect
-              - ping
-              - -A
-              - banzai
-          initialDelaySeconds: 3
-          timeoutSeconds: 5
-          periodSeconds: 3
+          readinessProbe:
+            exec:
+              command:
+                - celery
+                - inspect
+                - -A
+                - banzai
+                - ping
+            initialDelaySeconds: 3
+            timeoutSeconds: 5
+            periodSeconds: 3
         - name: banzai-floyds-e2e-listener
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: "{{ .Values.image.pullPolicy }}"

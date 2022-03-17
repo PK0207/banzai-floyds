@@ -64,8 +64,11 @@ def tophat_filter_metric(data, error, region):
     Parameters
     ----------
     data: array
+        Data to match filter
     error: array
+        Uncertainty array. Same shape as data
     region: array of booleans
+        Region in the top region of the hat to sum.
 
     Notes
     -----
@@ -86,10 +89,14 @@ def smooth_order_weights(params, x, height, k=2):
 
     Parameters
     ----------
-    params: array of floats: coefficients of the Legendre polynomial that describes the center of the order
-    x: tuple of arrays independent variables x, y. Arrays should be the same shape as the input data
-    height: Number of pixels in the top of the hat
-    k: float: sharpness parameter of the edges of the top-hat
+    params: array of floats
+        Coefficients of the Legendre polynomial that describes the center of the order
+    x: tuple of arrays independent variables x, y
+        Arrays should be the same shape as the input data
+    height: int
+        Number of pixels in the top of the hat
+    k: float
+        Sharpness parameter of the edges of the top-hat
 
     Returns
     -------
@@ -118,11 +125,16 @@ def smooth_order_jacobian(theta, x, i, height, k=2):
 
     Parameters
     ----------
-    theta: array of floats: coefficients of the Legendre polynomial that describes the center of the order
-    x: tuple of arrays independent variables x, y. Arrays should be the same shape as the input data
-    i: int: index of the coefficient to take a partial derivative with respect to
-    height: Number of pixels in the top of the hat
-    k: float: sharpness parameter of the edges of the top-hat
+    theta: array of floats
+        Coefficients of the Legendre polynomial that describes the center of the order
+    x: tuple of arrays independent variables x, y
+        Arrays should be the same shape as the input data
+    i: int
+        index of the coefficient to take a partial derivative with respect to
+    height: int
+        Number of pixels in the top of the hat
+    k: float
+        Sharpness parameter of the edges of the top-hat
 
     Returns
     -------
@@ -156,12 +168,18 @@ def smooth_order_hessian(theta, x, i, j, height, k=2):
 
     Parameters
     ----------
-    array of floats: coefficients of the Legendre polynomial that describes the center of the order
-    x: tuple of arrays independent variables x, y. Arrays should be the same shape as the input data
-    i: int: index of the coefficient to take the first partial derivative with respect to
-    j: int: index of the coefficient to take the second partial derivative with respect to
-    height: Number of pixels in the top of the hat
-    k: float: sharpness parameter of the edges of the top-hat
+    theta: array of floats
+        Coefficients of the Legendre polynomial that describes the center of the order
+    x: tuple of arrays independent variables x, y.
+        Arrays should be the same shape as the input data
+    i: int
+        Index of the coefficient to take the first partial derivative with respect to
+    j: int
+        Index of the coefficient to take the second partial derivative with respect to
+    height: int
+        Number of pixels in the top of the hat
+    k: float
+        Sharpness parameter of the edges of the top-hat
 
     Returns
     -------
@@ -194,9 +212,12 @@ def order_region(order_height, center, image_size):
 
     Parameters
     ----------
-    order_height: int: Number of pixels in the top of the hat
-    center: callable model function that describes the center of the order, must have a domain property
-    image_size: tuple of ints, shape of the input/output arrays
+    order_height: int
+        Number of pixels in the top of the hat
+    center: callable model function
+        Model describes the center of the order, must have a domain property
+    image_size: tuple of ints
+        Shape of the input/output arrays
 
     Returns
     -------
@@ -219,11 +240,16 @@ def estimate_order_centers(data, error, order_height, peak_separation=10, min_si
 
     Parameters
     ----------
-    data: array: data to search for orders, often a central slice of the full dataset
-    error: array: error array, same shape as the passed data
-    order_height: int: Number of pixels in the top of the hat
-    peak_separation: float: minimum distance between real peaks
-    min_signal_to_noise: float: Minimium value of the signal/noise metric to return in the list of peaks
+    data: array
+        Data to search for orders, often a central slice of the full dataset
+    error: array
+        Error array, same shape as the passed data
+    order_height: int
+        Number of pixels in the top of the hat
+    peak_separation: float
+        Minimum distance between real peaks
+    min_signal_to_noise: float
+        Minimium value of the signal/noise metric to return in the list of peaks
 
     Returns
     -------
@@ -249,9 +275,12 @@ def fit_order_curve(data, error, order_height, initial_guess):
     Parameters
     ----------
     data: array to fit order
-    error: array of uncertainties, same shapes as the input data array
-    order_height: int: Number of pixels in the top of the hat
-    initial_guess: array of initial guesses for the Legendre polynomial coefficients of the center of the order
+    error: array of uncertainties
+        Same shapes as the input data array
+    order_height: int
+        Number of pixels in the top of the hat
+    initial_guess: array
+        Initial guesses for the Legendre polynomial coefficients of the center of the order
 
     Returns
     -------
@@ -273,13 +302,20 @@ def trace_order(data, error, order_height, initial_center, initial_center_x,
     Parameters
     ----------
     data: array to trace order
-    error: array of uncertainties, same shapes as the input data array
-    order_height: int: Number of pixels in the top of the hat
-    initial_center: int: Starting guess for y value of the center of the order
-    initial_center_x: int: x-coordinate for the starting y-value guess
-    step_size: int: number of pixels to step between each estimate of the trace center
-    filter_width: int: x-width of the filter to sum to search for peaks in the metric
-    search_height: int: number of pixels to search above and below the previous best center
+    error: array of uncertainties
+        Same shapes as the input data array
+    order_height: int
+        Number of pixels in the top of the hat
+    initial_center: int
+        Starting guess for y value of the center of the order
+    initial_center_x: int
+        x-coordinate for the starting y-value guess
+    step_size: int
+        Number of pixels to step between each estimate of the trace center
+    filter_width: int
+        x-width of the filter to sum to search for peaks in the metric
+    search_height: int
+        Number of pixels to search above and below the previous best center
 
     Returns
     -------

@@ -36,8 +36,10 @@ def matched_filter_normalization(error, weights):
 
     Parameters
     ----------
-    error: array of uncertainties, should be the same shape as the input data
-    weights: array of match filter weights, should be the same shape as the input data
+    error: array of uncertainties
+        Should be the same shape as the input data
+    weights: array of match filter weights
+        Should be the same shape as the input data
 
     Returns
     -------
@@ -60,17 +62,22 @@ def matched_filter_metric(theta, data, error, weights_function, weights_jacobian
 
     Parameters
     ----------
-    theta: array of input values for the parameters of the weights function that in principle can be varied
-           using scipy.optimize.minimize
+    theta: array
+        input values for the parameters of the weights function that in principle can be varied using
+        scipy.optimize.minimize
     data: array of the data to match filter
-    error: array of uncertainties, should be the same size as the data array
-    weights_function: callable function to calculate the match filter weights. Should return an array the same shape as
-                     input data.
-    weights_jacobian_function: Not used in this function. This is only included here because scipy.minimize.optimize
-                               passes the same arguments to jacobian and hessian functions.
-    weights_hessian_function: Not used in this function. This is only included here because scipy.minimize.optimize
-                              passes the same arguments to jacobian and hessian functions.
-    x: tuple of arrays independent variables x, y. Arrays should be the same shape as the input data
+    error: array of uncertainties
+        Should be the same size as the data array
+    weights_function: callable function
+        Function to calculate the match filter weights. Should return an array the same shape as input data.
+    weights_jacobian_function: Not used in this function.
+        This is only included here because scipy.minimize.optimize passes the same arguments to jacobian and
+        hessian functions.
+    weights_hessian_function: Not used in this function.
+        This is only included here because scipy.minimize.optimize passes the same arguments to jacobian and
+        hessian functions.
+    x: tuple of arrays independent variables x, y.
+        Arrays should be the same shape as the input data
     args: tuple of any other static arguments that should be passed to the weights function.
 
     Returns
@@ -89,14 +96,19 @@ def matched_filter_signal_jacobian(theta, x, data, error, weights_jacobian_funct
 
     Parameters
     ----------
-    theta: array of input values for the parameters of the weights function that in principle can be varied
-           using scipy.optimize.minimize
-    x: tuple of arrays independent variables x, y. Arrays should be the same shape as the input data
+    theta: array
+        Input values for the parameters of the weights function that in principle can be varied using
+        scipy.optimize.minimize
+    x: tuple of arrays independent variables x, y.
+        Arrays should be the same shape as the input data
     data: array of the data to match filter
-    error: array of uncertainties, should be the same size as the data array    x
-    weights_jacobian_function: callable function to calculate the ith component of the jacobian given the parameters
-                               should return an array that is the same shape as data
-    args: tuple of any other static arguments that should be passed to the weights function.
+    error: array of uncertainties
+        Should be the same size as the data array
+    weights_jacobian_function: callable function
+        Function to calculate the ith component of the jacobian given the parameters
+        Should return an array that is the same shape as data
+    args: tuple
+        Any other static arguments that should be passed to the weights function.
 
     Returns
     -------
@@ -116,15 +128,22 @@ def matched_filter_normalization_jacobian(theta, x, weights, error, weights_jaco
 
     Parameters
     ----------
-    theta: array of input values for the parameters of the weights function that in principle can be varied
-           using scipy.optimize.minimize
-    x: tuple of arrays independent variables x, y. Arrays should be the same shape as the input data
-    weights: array of match filter weights, should be the same shape as the input data
-    error: array of uncertainties, should be the same size as the data array
-    weights_jacobian_function: callable function to calculate the ith component of the jacobian given the parameters
-                               should return an array that is the same shape as data
-    normalization: precalculated value of the original normalization using the weights function
-    args: tuple of any other static arguments that should be passed to the weights function.
+    theta: array
+        Input values for the parameters of the weights function that in principle can be varied using
+        scipy.optimize.minimize
+    x: tuple of arrays independent variables x, y.
+        Arrays should be the same shape as the input data
+    weights: array of match filter weights
+        Should be the same shape as the input data
+    error: array of uncertainties
+        Should be the same size as the data array
+    weights_jacobian_function: callable function
+        Function to calculate the ith component of the jacobian given the parameters should return an array that
+         is the same shape as data
+    normalization: float
+        Precalculated value of the original normalization using the weights function
+    args: tuple
+        Any other static arguments that should be passed to the weights function.
 
     Returns
     -------
@@ -146,18 +165,25 @@ def matched_filter_jacobian(theta, data, error, weights_function, weights_jacobi
 
     Parameters
     ----------
-    theta: array of input values for the parameters of the weights function that in principle can be varied
-           using scipy.optimize.minimize
+    theta: array
+        Input values for the parameters of the weights function that in principle can be varied using
+        scipy.optimize.minimize
     data: array of the data to match filter
-    error: array of uncertainties, should be the same size as the data array    x
-    weights_functions: callable function to calculate the match filter weights. Should return an array the same shape as
-                      input data.
-    weights_jacobian_function: callable function to calculate the ith component of the jacobian given the parameters
-                               should return an array that is the same shape as data
-    weights_hessian_function: Not used in this function. This is only included here because scipy.minimize.optimize
-                              passes the same arguments to jacobian and hessian functions.
-    x: tuple of arrays independent variables x, y. Arrays should be the same shape as the input data
-    args: tuple of any other static arguments that should be passed to the weights function.
+    error: array of uncertainties
+        Should be the same size as the data array
+    weights_functions: callable function
+        Function to calculate the match filter weights.
+        Should return an array the same shape as input data.
+    weights_jacobian_function: callable function
+        Function to calculate the ith component of the jacobian given the parameters
+        Should return an array that is the same shape as data
+    weights_hessian_function: Not used in this function.
+        This is only included here because scipy.minimize.optimize passes the same arguments to the
+        jacobian and hessian functions.
+    x: tuple of arrays independent variables x, y.
+        Arrays should be the same shape as the input data
+    args: tuple
+        Any other static arguments that should be passed to the weights function.
 
     Returns
     -------
@@ -185,18 +211,25 @@ def matched_filter_hessian(theta, data, error, weights_function, weights_jacobia
 
     Parameters
     ----------
-    theta: array of input values for the parameters of the weights function that in principle can be varied
-           using scipy.optimize.minimize
+    theta: array
+        Input values for the parameters of the weights function that in principle can be varied using
+        scipy.optimize.minimize
     data: array of the data to match filter
-    error: array of uncertainties, should be the same size as the data array    x
-    weights_functions: callable function to calculate the match filter weights. Should return an array the same shape as
-                       input data.
-    weights_jacobian_function: callable function to calculate the ith component of the jacobian given the parameters
-                               should return an array that is the same shape as data
-    weights_hessian_function: callable function to calculate the i,j component of the hessian of the weights.
-                              should return an array that is the same shape as data
-    x: tuple of arrays independent variables x, y. Arrays should be the same shape as the input data
-    args: tuple of any other static arguments that should be passed to the weights function.
+    error: array of uncertainties
+        Should be the same size as the data array
+    weights_functions: callable function
+        Function to calculate the match filter weights.
+        Should return an array the same shape as input data.
+    weights_jacobian_function: callable function
+        Function to calculate the ith component of the jacobian given the parameters
+        Should return an array that is the same shape as data
+    weights_hessian_function: callable function
+        Function to calculate the i,j component of the hessian of the weights.
+        Should return an array that is the same shape as data
+    x: tuple of arrays independent variables x, y
+        Arrays should be the same shape as the input data
+    args: tuple
+        Any other static arguments that should be passed to the weights function.
 
     Returns
     -------
@@ -278,15 +311,21 @@ def maximize_match_filter(initial_guess, data, error, weights_function, x, weigh
     ----------
     initial_guess: array of initial values for the model parameters to be fit
     data: array of data to match filter
-    error: array of uncertainties, should be the same shape as data
-    weight_functions: callable function to calculate the match filter weights. Should return an array the same shape as
-                      input data.
-    x: tuple of arrays independent variables x, y. Arrays should be the same shape as the input data
-    weights_jacobian_function: optional: callable function to calculate the ith component of the jacobian given
-                               the parameters should return an array that is the same shape as data
-    weights_hessian_function: optional: callable function to calculate the i,j component of the hessian of the weights.
-                              should return an array that is the same shape as data
-    args: tuple of any other static arguments that should be passed to the weights function.
+    error: array of uncertainties
+        Should be the same shape as data
+    weight_functions: callable function
+        Function to calculate the match filter weights
+        Should return an array the same shape as input data.
+    x: tuple of arrays independent variables x, y
+        Arrays should be the same shape as the input data
+    weights_jacobian_function: optional: callable function
+        Function to calculate the ith component of the jacobian given the parameters
+        Should return an array that is the same shape as data
+    weights_hessian_function: optional: callable function
+        Function to calculate the i,j component of the hessian of the weights.
+        Should return an array that is the same shape as data
+    args: tuple
+        Any other static arguments that should be passed to the weights function.
 
     Returns
     -------

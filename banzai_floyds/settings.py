@@ -2,6 +2,7 @@ from banzai.settings import *  # noqa: F401,F403
 
 ORDERED_STAGES = ['banzai.bias.OverscanSubtractor',
                   'banzai.trim.Trimmer',
+                  'banzai.gain.GainNormalizer',
                   'banzai.uncertainty.PoissonInitializer',
                   'banzai_floyds.orders.OrderLoader']
 

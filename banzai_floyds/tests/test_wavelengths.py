@@ -16,24 +16,36 @@ def test_1d_metric():
     test_lines = [{"wavelength": peak_cntr, 'line_strength': line_strs[i]}
                   for i, peak_cntr in enumerate(peak_angstroms)]
 
-    # simulate a spectrum with some fraction of those lines
+    # simulate a spectrum
     nx = 512
     data_1d = np.zeros(nx)
-    peak_pixels = peak_cntrs * nx
-    fwhm = 5
 
-    # data_1d += np.random.poisson(500.0, size=data_1d.shape)
-    data_1d += np.random.normal(100, scale=10, size=data_1d.shape)
+    # Add known lines
+    peak_pixels = peak_cntrs * nx
+    fwhm = 1
+    flux_scale = 1200
     for i, peak in enumerate(peak_pixels):
-        data_1d += gaussian(np.arange(512), peak, fwhm, line_strs[i] * 1200)
+        data_1d += gaussian(np.arange(nx), peak, fwhm, line_strs[i] * flux_scale)
+    mp.plot(data_1d)
+
+    # add extra lines
+    extre_lines_num = 3
+    unused_peaks = np.sort(rng.random(extre_lines_num)) * nx
+    unused_str = rng.random(extre_lines_num)
+    for i, peak in enumerate(unused_peaks):
+        data_1d += gaussian(np.arange(nx), peak, fwhm, unused_str[i] * flux_scale)
+
+    # Set the dispersion and some minor distortion
+
+    # add noise to the spectrum
+    noise_level = 30
+    bias = 5
+    data_1d += np.random.normal(bias, scale=noise_level, size=data_1d.shape)
+
+    # Cross correlate the spectrum
+    # Find the linear part of the wavelength solution
 
     print(data_1d)
     mp.plot(data_1d)
     mp.show()
-
-    # Set the dispersion and some minor distortion
-    # add noise to the spectrum
-
-    # Cross correlate the spectrum
-    # Find the linear part of the wavelength solution
     pass

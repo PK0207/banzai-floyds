@@ -171,7 +171,7 @@ def matched_filter_jacobian(theta, data, error, weights_function, weights_jacobi
     data: array of the data to match filter
     error: array of uncertainties
         Should be the same size as the data array
-    weights_functions: callable function
+    weights_function: callable function
         Function to calculate the match filter weights.
         Should return an array the same shape as input data.
     weights_jacobian_function: callable function
@@ -217,7 +217,7 @@ def matched_filter_hessian(theta, data, error, weights_function, weights_jacobia
     data: array of the data to match filter
     error: array of uncertainties
         Should be the same size as the data array
-    weights_functions: callable function
+    weights_function: callable function
         Function to calculate the match filter weights.
         Should return an array the same shape as input data.
     weights_jacobian_function: callable function

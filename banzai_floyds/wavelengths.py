@@ -43,8 +43,7 @@ def linear_wavelength_solution(data, error, lines, dispersion, line_width, offse
     return Legendre((best_fit_offset, slope), domain=(0, len(data) - 1))
 
 
-def identify_peaks(data, error, line_width):
-    # apply linear model to data
+def identify_peaks(data, error, line_width, line_sep):
     # extract peak locations
     kernel_x = np.arange(-15, 16, 1)[::-1]
     kernel = gauss(kernel_x, 0.0, line_width)
@@ -53,7 +52,7 @@ def identify_peaks(data, error, line_width):
     normalization = np.convolve(kernel * kernel, 1.0 / error / error, mode='same')
 
     metric = signal / normalization
-    peaks, peak_properties = find_peaks(metric, height=50.0, distance=30.0)
+    peaks, peak_properties = find_peaks(metric, height=50.0, distance=line_sep)
     return peaks
 
 

@@ -1,6 +1,7 @@
 import numpy as np
 from numpy.polynomial.legendre import Legendre
 from banzai_floyds.matched_filter import matched_filter_metric
+from scipy.signal import find_peaks
 
 
 def gauss(x, mu, sigma):
@@ -42,15 +43,36 @@ def linear_wavelength_solution(data, error, lines, dispersion, line_width, offse
     return Legendre((best_fit_offset, slope), domain=(0, len(data) - 1))
 
 
-def extract_peaks(data, error, linear_model):
+def identify_peaks(data, error, line_width):
     # apply linear model to data
     # extract peak locations
-    #
+    kernel_x = np.arange(-15, 16, 1)[::-1]
+    kernel = gauss(kernel_x, 0.0, line_width)
+
+    signal = np.convolve(kernel, data / error / error, mode='same')
+    normalization = np.convolve(kernel * kernel, 1.0 / error / error, mode='same')
+
+    metric = signal / normalization
+    peaks, peak_properties = find_peaks(metric, height=50.0, distance=30.0)
+    return peaks
+
+
+def refine_peak_centers():
+    # maybe maximize a gaussian weight filter with a variable line widths and center?
     pass
 
 
-def identify_peaks(data, error, linear_model, lines):
-    # extract peaks
+def correlate_peaks(peaks, linear_model, lines, match_threshold):
+    guessed_wavelengths = linear_model(peaks)
+    corresponding_lines = []
     # correlate detected peaks to known wavelengths
-    # create model for detected lines
-    pass
+    for peak in guessed_wavelengths:
+        corresponding_line = lines['wavelength'][np.argmin(np.abs(peak - lines['wavelength']))]
+        if np.abs(corresponding_line - peak) >= match_threshold:
+            corresponding_line = None
+        corresponding_lines.append(corresponding_line)
+    return corresponding_lines
+
+
+def estimate_distortion(peaks, corresponding_wavelengths, domain, order=4):
+    return Legendre.fit(deg=order, x=peaks, y=corresponding_wavelengths, domain=domain)

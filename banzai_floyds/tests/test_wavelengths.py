@@ -37,6 +37,9 @@ def test_1d_metric():
     for i, peak in enumerate(unused_peaks):
         data_1d += gaussian(np.arange(nx), peak, fwhm, unused_str[i] * flux_scale)
 
+    # add continuum:
+    data_1d += gaussian(np.arange(nx), nx // 2, nx // 10, flux_scale / 10)
+
     # Set the dispersion and some minor distortion
 
     # add noise to the spectrum

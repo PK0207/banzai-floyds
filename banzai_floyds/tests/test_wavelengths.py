@@ -47,7 +47,6 @@ def test_1d_metric():
     # Cross correlate the spectrum
     # Find the linear part of the wavelength solution
 
-    print(data_1d)
     mp.plot(data_1d)
     mp.show()
     pass

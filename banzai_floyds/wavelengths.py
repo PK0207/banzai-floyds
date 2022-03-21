@@ -40,3 +40,17 @@ def linear_wavelength_solution(data, error, lines, dispersion, line_width, offse
                                      np.arange(data.size), lines, line_width) for offset in offset_range]
     best_fit_offset = offset_range[np.argmax(metrics)]
     return Legendre((best_fit_offset, slope), domain=(0, len(data) - 1))
+
+
+def extract_peaks(data, error, linear_model):
+    # apply linear model to data
+    # extract peak locations
+    #
+    pass
+
+
+def identify_peaks(data, error, linear_model, lines):
+    # extract peaks
+    # correlate detected peaks to known wavelengths
+    # create model for detected lines
+    pass

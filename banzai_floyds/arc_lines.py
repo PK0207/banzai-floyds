@@ -5,7 +5,7 @@ Strengths are determined for the 2" slit using ogg2m001-en06-20220222-0036-a00.f
 Blue lines have been calibrated to match the red strengths based on the overlapping 5460.75 line.
 Lines without strengths could not be found, possibly too weak or blended with nearby lines.
 """
-
+from astropy.table import Table
 
 used_lines = [{'wavelength': 3650.158, 'line_strength': 0.0556, 'line_source': 'Hg', 'line_notes': ''},
               {'wavelength': 3654.842, 'line_strength': '', 'line_source': 'Hg', 'line_notes': ''},
@@ -73,3 +73,32 @@ unused_lines = [{'wavelength': 3451.689, 'line_strength': '', 'line_source': 'Hg
                 {'wavelength': 11078.87, 'line_strength': '', 'line_source': 'ArI', 'line_notes': 'No flux in FLOYDS'},
                 {'wavelength': 11106.44, 'line_strength': '', 'line_source': 'ArI', 'line_notes': 'No flux in FLOYDS'}
                 ]
+
+
+def arc_lines_table():
+    wavelength = []
+    strength = []
+    source = []
+    notes = []
+    used = []
+    for line in used_lines:
+        wavelength.append(line['wavelength'])
+        strength.append(line['line_strength'])
+        source.append(line['line_source'])
+        notes.append(line['line_notes'])
+        used.append(True)
+
+    for line in unused_lines:
+        wavelength.append(line['wavelength'])
+        strength.append(line['line_strength'])
+        source.append(line['line_source'])
+        notes.append(line['line_notes'])
+        used.append(False)
+
+    lines_table = Table({'wavelength': wavelength,
+                         'strength': strength,
+                         'source': source,
+                         'notes': notes,
+                         'used': used})
+
+    return lines_table

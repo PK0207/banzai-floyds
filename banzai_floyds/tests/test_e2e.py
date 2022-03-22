@@ -74,20 +74,21 @@ class TestOrderDetection:
     @pytest.fixture(autouse=True)
     def process_skyflat(self, init):
         # Pull down our experimental skyflat
-        skyflat_info = ascii.read(pkg_resources.resource_filename('banzai_floyds.tests', 'data/test_skyflat.dat'))[0]
-        skyflat_info = dict(skyflat_info)
-        context = banzai.main.parse_args(settings, parse_system_args=False)
-        skyflat_hdu = fits.open(download_from_s3(skyflat_info, context))
+        skyflat_files = ascii.read(pkg_resources.resource_filename('banzai_floyds.tests', 'data/test_skyflat.dat'))
+        for skyflat in skyflat_files:
+            skyflat_info = dict(skyflat)
+            context = banzai.main.parse_args(settings, parse_system_args=False)
+            skyflat_hdu = fits.open(download_from_s3(skyflat_info, context))
 
-        # Munge the data to be OBSTYPE SKYFLAT
-        skyflat_hdu['SCI'].header['OBSTYPE'] = 'SKYFLAT'
-        skyflat_name = skyflat_info["filename"].replace("x00.fits", "f00.fits")
-        filename = os.path.join('/archive', 'engineering', f'{skyflat_name}')
-        skyflat_hdu.writeto(filename, overwrite=True)
-        skyflat_hdu.close()
-        # Process the data
-        file_utils.post_to_archive_queue(filename, os.getenv('FITS_BROKER'),
-                                         exchange_name=os.getenv('FITS_EXCHANGE'))
+            # Munge the data to be OBSTYPE SKYFLAT
+            skyflat_hdu['SCI'].header['OBSTYPE'] = 'SKYFLAT'
+            skyflat_name = skyflat_info["filename"].replace("x00.fits", "f00.fits")
+            filename = os.path.join('/archive', 'engineering', f'{skyflat_name}')
+            skyflat_hdu.writeto(filename, overwrite=True)
+            skyflat_hdu.close()
+            # Process the data
+            file_utils.post_to_archive_queue(filename, os.getenv('FITS_BROKER'),
+                                             exchange_name=os.getenv('FITS_EXCHANGE'))
 
         celery_join()
 

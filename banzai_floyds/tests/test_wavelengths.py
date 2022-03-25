@@ -1,5 +1,5 @@
 from matplotlib import pyplot as mp
-from banzai_floyds.wavelengths import gauss, linear_wavelength_solution, identify_peaks
+from banzai_floyds.wavelengths import gauss, linear_wavelength_solution, identify_peaks, correlate_peaks
 import numpy as np
 from astropy.table import Table
 
@@ -80,6 +80,8 @@ def test_linear_wavelength_solution():
 
 
 def test_identify_peaks():
+    # Pick well behaved seed
+    np.random.seed(76856)
     lines = Table({'wavelength': np.random.uniform(low=3500.0, high=5500.0, size=10),
                    'strength': np.random.uniform(low=0.0, high=1.0, size=10)})
 
@@ -94,7 +96,7 @@ def test_identify_peaks():
     flux_scale = 1200
     line_sep = 10
 
-    # simulate a spectrum with some fraction of those lines
+    # simulate a spectrum
     test_lines = []
     for line in lines:
         # And why roots is a property on poly1d objects and a method on numpy.polynomial.legendre. 🤦
@@ -105,5 +107,54 @@ def test_identify_peaks():
     recovered_peaks = identify_peaks(input_spectrum, 0.01 * np.ones_like(input_spectrum), line_width, line_sep)
 
     # Need to figure out how to handle blurred lines and combined peaks
-    # for peak in recovered_peaks:
-    #     assert (peak in test_lines)
+    for peak in recovered_peaks:
+        assert (peak in test_lines)
+
+
+def test_correlate_peaks():
+    # make a random list of lines
+    peaks = np.random.uniform(low=3500.0, high=5500.0, size=10)
+    lines = Table({'wavelength': peaks,
+                   'strength': np.random.uniform(low=0.0, high=1.0, size=10)})
+    used_lines = 6
+
+    nx = 1001
+    input_spectrum = np.zeros(nx)
+    min_wavelength = 3200
+    dispersion = 2.5
+    # Why the coefficients in poly1d are in reverse order from numpy.polynomial.legendre is just beyond me
+    input_wavelength_solution = np.poly1d((dispersion, min_wavelength))
+    x_pixels = np.arange(nx)
+    line_width = 3
+    flux_scale = 1200
+
+    # simulate a spectrum
+    test_peaks = []
+    for line in lines:
+        # And why roots is a property on poly1d objects and a method on numpy.polynomial.legendre. 🤦
+        peak_center = (input_wavelength_solution - line['wavelength']).roots
+        input_spectrum += line['strength'] * gauss(x_pixels, peak_center, line_width) * flux_scale
+        test_peaks.append(round(peak_center[0]))
+
+    linear_model = linear_wavelength_solution(input_spectrum, 0.01 * np.ones_like(input_spectrum), lines,
+                                              dispersion, line_width, np.arange(4000, 5001))
+
+    # find corresponding lines with lines missing
+    match_threshold = 10
+    corresponding_lines = correlate_peaks(np.array(test_peaks[:used_lines]), linear_model, lines, match_threshold)
+    for corresponding_line in corresponding_lines:
+        assert corresponding_line in lines["wavelength"][:used_lines]
+
+    valid_line_count = len([cline for cline in corresponding_lines if cline])
+    assert valid_line_count == used_lines
+
+    # find corresponding lines with extra lines
+    test_peaks_with_extra = np.concatenate((np.array(test_peaks[:used_lines]), np.random.uniform(0, 1000, 3)))
+    match_threshold = 10
+    corresponding_lines = correlate_peaks(test_peaks_with_extra, linear_model, lines, match_threshold)
+    for corresponding_line in corresponding_lines:
+        if corresponding_line:
+            assert corresponding_line in lines["wavelength"][:used_lines]
+
+    valid_line_count = len([cline for cline in corresponding_lines if cline])
+    assert valid_line_count == used_lines

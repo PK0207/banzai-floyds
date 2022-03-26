@@ -19,21 +19,23 @@ def wavelength_model_weights(theta, x, lines, line_width):
 
 def linear_wavelength_solution(data, error, lines, dispersion, line_width, offset_range):
     """
+    Get best fit first-order wavelength solution
 
     Parameters
     ----------
-    data
-    error
-    lines
+    data: array of 1D raw spectrum extraction
+    error: array of uncertainties
+            Same shapes as the input data array
+    lines: table containing 'wavelength' and 'strength' for each standard line
     dispersion: float
         Guess of Angstroms per pixel
-    line_width
+    line_width: average line width in angstroms
     offset_range: array
         Range of values to search for the offset in the linear wavelength solution
 
     Returns
     -------
-
+    linear model function that takes an array of pixels and outputs wavelengths
     """
     # Step the model spectrum metric through each of the offsets and find the peak
     slope = dispersion * (len(data) // 2)
@@ -44,6 +46,21 @@ def linear_wavelength_solution(data, error, lines, dispersion, line_width, offse
 
 
 def identify_peaks(data, error, line_width, line_sep):
+    """
+        Detect peaks in spectrum extraction
+
+        Parameters
+        ----------
+        data: array of 1D raw spectrum extraction
+        error: array of uncertainties
+                Same shapes as the input data array
+        line_width: average line width in angstroms
+        line_sep: minimum separation distance before lines are determined to be unique
+
+        Returns
+        -------
+        array containing the location of detected peaks
+        """
     # extract peak locations
     kernel_x = np.arange(-15, 16, 1)[::-1]
     kernel = gauss(kernel_x, 0.0, line_width)
@@ -62,6 +79,20 @@ def refine_peak_centers():
 
 
 def correlate_peaks(peaks, linear_model, lines, match_threshold):
+    """
+        Find the standard line peaks associated with the detected peaks in a raw 1D arc extraction
+
+        Parameters
+        ----------
+        peaks: array containing the pixel location of detected peaks
+        linear_model: 1st order fit function for the wavelength solution
+        lines: table containing 'wavelength' and 'strength' for each standard line
+        match_threshold: maximum separation for a pair of peaks to be considered a match.
+
+        Returns
+        -------
+        list of standard line peak wavelengths matching detected peaks
+        """
     guessed_wavelengths = linear_model(peaks)
     corresponding_lines = []
     # correlate detected peaks to known wavelengths

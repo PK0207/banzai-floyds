@@ -58,7 +58,9 @@ def test_1d_metric():
 def test_linear_wavelength_solution():
     # make a random list of lines
     lines = Table({'wavelength': np.random.uniform(low=3500.0, high=5500.0, size=10),
-                   'strength': np.random.uniform(low=0.0, high=1.0, size=10)})
+                   'strength': np.random.uniform(low=0.0, high=1.0, size=10),
+                   'line_source': ['Hg', 'Zn'] * 5
+                   },)
     nx = 1001
     input_spectrum = np.zeros(nx)
     min_wavelength = 3200
@@ -105,6 +107,7 @@ def test_identify_peaks():
         test_lines.append(round(peak_center[0]))
 
     recovered_peaks = identify_peaks(input_spectrum, 0.01 * np.ones_like(input_spectrum), line_width, line_sep)
+    print(type(recovered_peaks))
 
     # Need to figure out how to handle blurred lines and combined peaks
     for peak in recovered_peaks:
@@ -140,7 +143,7 @@ def test_correlate_peaks():
                                               dispersion, line_width, np.arange(4000, 5001))
 
     # find corresponding lines with lines missing
-    match_threshold = 10
+    match_threshold = 1
     corresponding_lines = correlate_peaks(np.array(test_peaks[:used_lines]), linear_model, lines, match_threshold)
     for corresponding_line in corresponding_lines:
         assert corresponding_line in lines["wavelength"][:used_lines]

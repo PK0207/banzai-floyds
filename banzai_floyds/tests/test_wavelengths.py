@@ -8,6 +8,33 @@ def gaussian(x, mu, sig, strength):
     return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.))) * strength
 
 
+def build_random_spectrum(seed=None, min_wavelength=3200, line_width=3, dispersion=2.5):
+    # If given seed, use well behaved seed
+    if seed:
+        np.random.seed(seed)
+    lines = Table({'wavelength': np.random.uniform(low=3500.0, high=5500.0, size=10),
+                   'strength': np.random.uniform(low=0.0, high=1.0, size=10),
+                   'line_source': ['Hg', 'Zn'] * 5
+                   },)
+
+    nx = 1001
+    input_spectrum = np.zeros(nx)
+
+    # Why the coefficients in poly1d are in reverse order from numpy.polynomial.legendre is just beyond me
+    input_wavelength_solution = np.poly1d((dispersion, min_wavelength))
+    x_pixels = np.arange(nx)
+    flux_scale = 1200
+
+    # simulate a spectrum
+    test_lines = []
+    for line in lines:
+        # And why roots is a property on poly1d objects and a method on numpy.polynomial.legendre. 🤦
+        peak_center = (input_wavelength_solution - line['wavelength']).roots
+        input_spectrum += line['strength'] * gauss(x_pixels, peak_center, line_width) * flux_scale
+        test_lines.append(round(peak_center[0]))
+    return input_spectrum, lines, test_lines
+
+
 def test_1d_metric():
     # make a random list of lines
     line_list_length = 10
@@ -56,25 +83,12 @@ def test_1d_metric():
 
 
 def test_linear_wavelength_solution():
-    # make a random list of lines
-    lines = Table({'wavelength': np.random.uniform(low=3500.0, high=5500.0, size=10),
-                   'strength': np.random.uniform(low=0.0, high=1.0, size=10),
-                   'line_source': ['Hg', 'Zn'] * 5
-                   },)
-    nx = 1001
-    input_spectrum = np.zeros(nx)
+
     min_wavelength = 3200
     dispersion = 2.5
-    # Why the coefficients in poly1d are in reverse order from numpy.polynomial.legendre is just beyond me
-    input_wavelength_solution = np.poly1d((dispersion, min_wavelength))
-    x_pixels = np.arange(nx)
     line_width = 3
-
-    # simulate a spectrum with some fraction of those lines
-    for line in lines:
-        # And why roots is a property on poly1d objects and a method on numpy.polynomial.legendre. 🤦
-        input_spectrum += line['strength'] * gauss(x_pixels, (input_wavelength_solution - line['wavelength']).roots,
-                                                   line_width)
+    input_spectrum, lines, test_lines = build_random_spectrum(min_wavelength=min_wavelength, dispersion=dispersion,
+                                                              line_width=line_width)
 
     linear_model = linear_wavelength_solution(input_spectrum, 0.01 * np.ones_like(input_spectrum), lines,
                                               dispersion, line_width, np.arange(4000, 5001))
@@ -82,32 +96,13 @@ def test_linear_wavelength_solution():
 
 
 def test_identify_peaks():
-    # Pick well behaved seed
-    np.random.seed(76856)
-    lines = Table({'wavelength': np.random.uniform(low=3500.0, high=5500.0, size=10),
-                   'strength': np.random.uniform(low=0.0, high=1.0, size=10)})
-
-    nx = 1001
-    input_spectrum = np.zeros(nx)
-    min_wavelength = 3200
-    dispersion = 2.5
-    # Why the coefficients in poly1d are in reverse order from numpy.polynomial.legendre is just beyond me
-    input_wavelength_solution = np.poly1d((dispersion, min_wavelength))
-    x_pixels = np.arange(nx)
+    # use well-behaved seed
+    seed = 76856
     line_width = 3
-    flux_scale = 1200
     line_sep = 10
-
-    # simulate a spectrum
-    test_lines = []
-    for line in lines:
-        # And why roots is a property on poly1d objects and a method on numpy.polynomial.legendre. 🤦
-        peak_center = (input_wavelength_solution - line['wavelength']).roots
-        input_spectrum += line['strength'] * gauss(x_pixels, peak_center, line_width) * flux_scale
-        test_lines.append(round(peak_center[0]))
+    input_spectrum, lines, test_lines = build_random_spectrum(seed=seed, line_width=line_width)
 
     recovered_peaks = identify_peaks(input_spectrum, 0.01 * np.ones_like(input_spectrum), line_width, line_sep)
-    print(type(recovered_peaks))
 
     # Need to figure out how to handle blurred lines and combined peaks
     for peak in recovered_peaks:
@@ -115,29 +110,12 @@ def test_identify_peaks():
 
 
 def test_correlate_peaks():
-    # make a random list of lines
-    peaks = np.random.uniform(low=3500.0, high=5500.0, size=10)
-    lines = Table({'wavelength': peaks,
-                   'strength': np.random.uniform(low=0.0, high=1.0, size=10)})
-    used_lines = 6
-
-    nx = 1001
-    input_spectrum = np.zeros(nx)
     min_wavelength = 3200
     dispersion = 2.5
-    # Why the coefficients in poly1d are in reverse order from numpy.polynomial.legendre is just beyond me
-    input_wavelength_solution = np.poly1d((dispersion, min_wavelength))
-    x_pixels = np.arange(nx)
     line_width = 3
-    flux_scale = 1200
-
-    # simulate a spectrum
-    test_peaks = []
-    for line in lines:
-        # And why roots is a property on poly1d objects and a method on numpy.polynomial.legendre. 🤦
-        peak_center = (input_wavelength_solution - line['wavelength']).roots
-        input_spectrum += line['strength'] * gauss(x_pixels, peak_center, line_width) * flux_scale
-        test_peaks.append(round(peak_center[0]))
+    used_lines = 6
+    input_spectrum, lines, test_peaks = build_random_spectrum(min_wavelength=min_wavelength, dispersion=dispersion,
+                                                              line_width=line_width)
 
     linear_model = linear_wavelength_solution(input_spectrum, 0.01 * np.ones_like(input_spectrum), lines,
                                               dispersion, line_width, np.arange(4000, 5001))

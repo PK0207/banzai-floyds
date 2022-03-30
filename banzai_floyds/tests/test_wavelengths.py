@@ -1,5 +1,6 @@
 from matplotlib import pyplot as mp
-from banzai_floyds.wavelengths import gauss, linear_wavelength_solution, identify_peaks, correlate_peaks
+from banzai_floyds.wavelengths import gauss, linear_wavelength_solution, identify_peaks, correlate_peaks,\
+    refine_peak_centers
 import numpy as np
 from astropy.table import Table
 
@@ -31,7 +32,7 @@ def build_random_spectrum(seed=None, min_wavelength=3200, line_width=3, dispersi
         # And why roots is a property on poly1d objects and a method on numpy.polynomial.legendre. 🤦
         peak_center = (input_wavelength_solution - line['wavelength']).roots
         input_spectrum += line['strength'] * gauss(x_pixels, peak_center, line_width) * flux_scale
-        test_lines.append(round(peak_center[0]))
+        test_lines.append(peak_center[0])
     return input_spectrum, lines, test_lines
 
 
@@ -106,7 +107,7 @@ def test_identify_peaks():
 
     # Need to figure out how to handle blurred lines and combined peaks
     for peak in recovered_peaks:
-        assert (peak in test_lines)
+        assert (peak in np.around(test_lines))
 
 
 def test_correlate_peaks():
@@ -139,3 +140,30 @@ def test_correlate_peaks():
 
     valid_line_count = len([cline for cline in corresponding_lines if cline])
     assert valid_line_count == used_lines
+
+
+def test_refine_peak_centers():
+    # use well-behaved seed
+    seed = 75827
+    line_width = 3
+    line_sep = 10
+    input_spectrum, lines, test_lines = build_random_spectrum(seed=seed, line_width=line_width)
+
+    recovered_peaks = identify_peaks(input_spectrum, 0.01 * np.ones_like(input_spectrum), line_width, line_sep)
+
+    fit_list = refine_peak_centers(input_spectrum, 0.01 * np.ones_like(input_spectrum), recovered_peaks, line_width)
+
+    # x_pixels = np.linspace(0, input_spectrum.size, 10000)
+    # fit_spectrum = np.zeros(x_pixels.size)
+    # for fit in fit_list:
+    #     fit_spectrum += gauss(x_pixels, fit[0], fit[1], fit[2])
+    # for peak in recovered_peaks:
+    #     mp.plot([peak, peak], [-10, 200], color='red')
+    #     mp.plot(input_spectrum)
+    #     mp.plot(x_pixels, fit_spectrum, color="green")
+    #     mp.xlim([peak-15, peak+15])
+    #     mp.show()
+
+    # Need to figure out how to handle blurred lines and overlapping peaks.
+    for fit in fit_list:
+        assert np.min(abs(test_lines - fit[0])) < 1

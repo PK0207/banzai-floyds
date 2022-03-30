@@ -2,10 +2,24 @@ import numpy as np
 from numpy.polynomial.legendre import Legendre
 from banzai_floyds.matched_filter import matched_filter_metric
 from scipy.signal import find_peaks
+from scipy.optimize import curve_fit
 
 
-def gauss(x, mu, sigma):
-    return 1 / np.sqrt(2.0 * np.pi) / sigma * np.exp(-0.5 * (x - mu) * (x - mu) / sigma / sigma)
+def gauss(x, mu, sigma, scale=1):
+    """
+    return a normal distribution
+
+    Parameters
+    ----------
+    x: array of x values
+    mu: center/mean/median of normal distribution
+    sigma: standard deviation of normal distribution
+
+    Returns
+    -------
+    array of y values corresponding to x values in given normal distribution
+    """
+    return 1 / np.sqrt(2.0 * np.pi) / sigma * np.exp(-0.5 * (x - mu) * (x - mu) / sigma / sigma) * scale
 
 
 def wavelength_model_weights(theta, x, lines, line_width):
@@ -73,9 +87,35 @@ def identify_peaks(data, error, line_width, line_sep):
     return peaks
 
 
-def refine_peak_centers():
+def refine_peak_centers(data, error, peaks, line_width):
+    """
+        Find a precise center and width based on a gaussian fit to data
+
+        Parameters
+        ----------
+        data: array of 1D raw spectrum extraction
+        error: array of uncertainties
+                Same shapes as the input data array
+        peaks: array containing the pixel location of detected peaks
+        line_width: average line width in angstroms
+
+        Returns
+        -------
+        list of fit parameters for each peak:
+            Gaussian fit parameters: peak center, standard deviation, scale
+    """
     # maybe maximize a gaussian weight filter with a variable line widths and center?
-    pass
+    half_fit_window = 10 * line_width // 2
+    fits = []
+    for peak in peaks:
+        data_window = data[peak-half_fit_window:peak+half_fit_window]
+        parameters, covariance = curve_fit(gauss, np.arange(data_window.size), data_window,
+                                           (half_fit_window, line_width, np.max(data_window)),
+                                           bounds=([half_fit_window-1, line_width-1, -np.inf],
+                                                   [half_fit_window+1, line_width+1, np.inf]))
+
+        fits.append([parameters[0] + peak-half_fit_window, parameters[1], parameters[2]])
+    return fits
 
 
 def correlate_peaks(peaks, linear_model, lines, match_threshold):

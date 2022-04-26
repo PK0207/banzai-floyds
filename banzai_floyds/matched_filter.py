@@ -171,7 +171,7 @@ def matched_filter_jacobian(theta, data, error, weights_function, weights_jacobi
     data: array of the data to match filter
     error: array of uncertainties
         Should be the same size as the data array
-    weights_functions: callable function
+    weights_function: callable function
         Function to calculate the match filter weights.
         Should return an array the same shape as input data.
     weights_jacobian_function: callable function
@@ -217,7 +217,7 @@ def matched_filter_hessian(theta, data, error, weights_function, weights_jacobia
     data: array of the data to match filter
     error: array of uncertainties
         Should be the same size as the data array
-    weights_functions: callable function
+    weights_function: callable function
         Function to calculate the match filter weights.
         Should return an array the same shape as input data.
     weights_jacobian_function: callable function
@@ -336,6 +336,8 @@ def maximize_match_filter(initial_guess, data, error, weights_function, x, weigh
     Depending on if the Jacbian and Hessian functions are included, we choose our minimization algorithm based on this:
     https://scipy-lectures.org/advanced/mathematical_optimization/#choosing-a-method
     """
+    if args is None:
+        args = ()
     if weights_hessian_function is None and weights_jacobian_function is None:
         best_fit = minimize(lambda *params: -matched_filter_metric(*params), initial_guess,
                             args=(data, error, weights_function, weights_jacobian_function, weights_hessian_function, x,

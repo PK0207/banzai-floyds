@@ -133,12 +133,13 @@ def test_2d_wavelength_solution():
     # Convert between poly1d and legendre conventions
     converted_input_polynomial = Legendre((min_wavelength, dispersion), domain=(0, data.shape[1] - 1),
                                           window=(0, data.shape[1] - 1)).convert(domain=(0, data.shape[1] - 1))
+    # Note that weight function has the line width in angstroms whereas our line width here is in pixels
     params = full_wavelength_solution(data[input_order_region], error[input_order_region], x2d[input_order_region],
                                       (y2d - trace_center(x1d))[input_order_region], converted_input_polynomial.coef,
-                                      tilt, 2.5 * line_width, lines)
+                                      tilt, dispersion * line_width, lines)
 
     fit_tilt, fit_line_width, *fit_polynomial_coefficients = params
     # Assert that the best fit parameters are close to the inputs
     np.testing.assert_allclose(tilt, fit_tilt, atol=0.1)
-    np.testing.assert_allclose(2.5 * line_width, fit_line_width, atol=0.3)
+    np.testing.assert_allclose(dispersion * line_width, fit_line_width, atol=0.3)
     np.testing.assert_allclose(converted_input_polynomial.coef, fit_polynomial_coefficients, atol=0.1)

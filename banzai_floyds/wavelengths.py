@@ -2,10 +2,10 @@ import numpy as np
 from numpy.polynomial.legendre import Legendre
 from banzai_floyds.matched_filter import matched_filter_metric
 from scipy.signal import find_peaks
-from scipy.optimize import curve_fit
+from banzai_floyds.matched_filter import maximize_match_filter
 
 
-def gauss(x, mu, sigma, scale=1):
+def gauss(x, mu, sigma):
     """
     return a normal distribution
 
@@ -19,7 +19,7 @@ def gauss(x, mu, sigma, scale=1):
     -------
     array of y values corresponding to x values in given normal distribution
     """
-    return 1 / np.sqrt(2.0 * np.pi) / sigma * np.exp(-0.5 * (x - mu) * (x - mu) / sigma / sigma) * scale
+    return 1 / np.sqrt(2.0 * np.pi) / sigma * np.exp(-0.5 * (x - mu) * (x - mu) / sigma / sigma)
 
 
 def wavelength_model_weights(theta, x, lines, line_width):
@@ -68,7 +68,7 @@ def identify_peaks(data, error, line_width, line_sep):
         data: array of 1D raw spectrum extraction
         error: array of uncertainties
                 Same shapes as the input data array
-        line_width: average line width in angstroms
+        line_width: average line width (fwhm) in angstroms
         line_sep: minimum separation distance before lines are determined to be unique
 
         Returns
@@ -76,7 +76,9 @@ def identify_peaks(data, error, line_width, line_sep):
         array containing the location of detected peaks
         """
     # extract peak locations
-    kernel_x = np.arange(-15, 16, 1)[::-1]
+    # Assume +- 3 sigma for the kernel width
+    kernel_half_width = int(3 * line_width / 2.355)
+    kernel_x = np.arange(-kernel_half_width, kernel_half_width + 1, 1)[::-1]
     kernel = gauss(kernel_x, 0.0, line_width)
 
     signal = np.convolve(kernel, data / error / error, mode='same')
@@ -85,6 +87,12 @@ def identify_peaks(data, error, line_width, line_sep):
     metric = signal / normalization
     peaks, peak_properties = find_peaks(metric, height=50.0, distance=line_sep)
     return peaks
+
+
+def centroiding_weights(theta, x):
+    center, line_width = theta
+    sigma = line_width / (2 * np.sqrt(2 * np.log(2)))
+    return gauss(x, center, sigma)
 
 
 def refine_peak_centers(data, error, peaks, line_width):
@@ -104,18 +112,18 @@ def refine_peak_centers(data, error, peaks, line_width):
         list of fit parameters for each peak:
             Gaussian fit parameters: peak center, standard deviation, scale
     """
-    # maybe maximize a gaussian weight filter with a variable line widths and center?
-    half_fit_window = 10 * line_width // 2
-    fits = []
+    line_sigma = line_width / 2.355
+    half_fit_window = int(3 * line_sigma)
+    centers = []
     for peak in peaks:
-        data_window = data[peak-half_fit_window:peak+half_fit_window]
-        parameters, covariance = curve_fit(gauss, np.arange(data_window.size), data_window,
-                                           (half_fit_window, line_width, np.max(data_window)),
-                                           bounds=([half_fit_window-1, line_width-1, -np.inf],
-                                                   [half_fit_window+1, line_width+1, np.inf]))
-
-        fits.append([parameters[0] + peak-half_fit_window, parameters[1], parameters[2]])
-    return fits
+        window = slice(peak - half_fit_window, peak + half_fit_window + 1, 1)
+        data_window = data[window]
+        error_window = error[window]
+        x = np.arange(-half_fit_window, half_fit_window + 1, dtype=float)
+        best_fit_center, best_fit_line_width = maximize_match_filter((0, line_width), data_window, error_window,
+                                                                     centroiding_weights, x)
+        centers.append(best_fit_center + peak)
+    return centers
 
 
 def correlate_peaks(peaks, linear_model, lines, match_threshold):
@@ -146,3 +154,54 @@ def correlate_peaks(peaks, linear_model, lines, match_threshold):
 
 def estimate_distortion(peaks, corresponding_wavelengths, domain, order=4):
     return Legendre.fit(deg=order, x=peaks, y=corresponding_wavelengths, domain=domain)
+
+
+def full_wavelength_solution_weights(theta, coordinates, lines):
+    """
+    Produce a 2d model of arc fluxes given a line list and a wavelength solution polynomial, a tilt, and a line width
+
+    Parameters
+    ----------
+    theta: tuple: tilt, line_width, *polynomial_coefficients
+    coordinates: tuple of 2d arrays x, y. x and y are the coordinates of the data array for the model
+    lines: astropy table of the lines in the line list with wavelength (in angstroms) and strength
+
+    Returns
+    -------
+    model array: 2d array with the match filter weights given the wavelength solution model
+    """
+    tilt, line_width, *polynomial_coefficients = theta
+    x, y = coordinates
+    tilted_x = x + np.tan(np.deg2rad(tilt)) * y
+    wavelength_polynomial = Legendre(polynomial_coefficients, domain=(np.min(x), np.max(x)))
+    model_wavelengths = wavelength_polynomial(tilted_x)
+    model = np.zeros_like(model_wavelengths)
+    line_sigma = line_width / (2 * np.sqrt(2 * np.log(2)))
+    for line in lines:
+        # in principle we should set the resolution to be a constant, i.e. delta lambda / lambda, not the overall width
+        model += line['strength'] * gauss(model_wavelengths, line['wavelength'], line_sigma)
+    return model
+
+
+def full_wavelength_solution(data, error, x, y, initial_polynomial_coefficients, initial_tilt, initial_line_width,
+                             lines):
+    """
+    Use a match filter to estimate the best fit 2-d wavelength solution
+
+    Parameters
+    ----------
+    data: 2-d array with data to be fit
+    error: 2-d array error, same shape as data
+    x: 2-d array, x-coordinates of the data, same, shape as data
+    y: 2-d array, y-coordinates of the data, same, shape as data
+    initial_polynomial_coefficients: 1d array of the initial polynomial coefficients for the wavelength solution
+    initial_tilt: float: initial angle measured clockwise of up in degrees
+    initial_line_width: float: initial estimate of fwhm of the lines in angstroms
+    lines: astropy table: must have the columns of catalog center in angstroms, and strength
+    Returns
+    -------
+    best_fit_params: 1-d array: (best_fit_tilt, best_fit_line_width, *best_fit_polynomial_coefficients)
+    """
+    best_fit_params = maximize_match_filter((initial_tilt, initial_line_width, *initial_polynomial_coefficients), data,
+                                            error, full_wavelength_solution_weights, (x, y), args=(lines,))
+    return best_fit_params

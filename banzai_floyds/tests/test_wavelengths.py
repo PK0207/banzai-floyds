@@ -1,24 +1,20 @@
-from matplotlib import pyplot as mp
 from banzai_floyds.wavelengths import gauss, linear_wavelength_solution, identify_peaks, correlate_peaks,\
-    refine_peak_centers
+    refine_peak_centers, full_wavelength_solution
 import numpy as np
 from astropy.table import Table
+from numpy.polynomial.legendre import Legendre
+from banzai_floyds.orders import order_region
 
 
-def gaussian(x, mu, sig, strength):
-    return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.))) * strength
-
-
-def build_random_spectrum(seed=None, min_wavelength=3200, line_width=3, dispersion=2.5):
+def build_random_spectrum(seed=None, min_wavelength=3200, line_sigma=3, dispersion=2.5, nlines=10, nx=1001):
     # If given seed, use well behaved seed
     if seed:
         np.random.seed(seed)
-    lines = Table({'wavelength': np.random.uniform(low=3500.0, high=5500.0, size=10),
-                   'strength': np.random.uniform(low=0.0, high=1.0, size=10),
-                   'line_source': ['Hg', 'Zn'] * 5
+    lines = Table({'wavelength': np.random.uniform(low=3500.0, high=5500.0, size=nlines),
+                   'strength': np.random.uniform(low=0.0, high=1.0, size=nlines),
+                   'line_source': ['Hg', 'Zn'] * (nlines // 2)
                    },)
 
-    nx = 1001
     input_spectrum = np.zeros(nx)
 
     # Why the coefficients in poly1d are in reverse order from numpy.polynomial.legendre is just beyond me
@@ -31,56 +27,9 @@ def build_random_spectrum(seed=None, min_wavelength=3200, line_width=3, dispersi
     for line in lines:
         # And why roots is a property on poly1d objects and a method on numpy.polynomial.legendre. 🤦
         peak_center = (input_wavelength_solution - line['wavelength']).roots
-        input_spectrum += line['strength'] * gauss(x_pixels, peak_center, line_width) * flux_scale
+        input_spectrum += line['strength'] * gauss(x_pixels, peak_center, line_sigma) * flux_scale
         test_lines.append(peak_center[0])
     return input_spectrum, lines, test_lines
-
-
-def test_1d_metric():
-    # make a random list of lines
-    line_list_length = 10
-    rng = np.random.default_rng()
-    line_strs = rng.random(line_list_length)
-    peak_cntrs = np.sort(rng.random(line_list_length))
-    peak_angstroms = peak_cntrs * 7000 + 3000
-    test_lines = [{"wavelength": peak_cntr, 'line_strength': line_strs[i]}
-                  for i, peak_cntr in enumerate(peak_angstroms)]
-
-    # simulate a spectrum
-    nx = 512
-    data_1d = np.zeros(nx)
-
-    # Add known lines
-    peak_pixels = peak_cntrs * nx
-    fwhm = 1
-    flux_scale = 1200
-    for peak, strength in zip(peak_pixels, line_strs):
-        data_1d += gaussian(np.arange(nx), peak, fwhm, strength * flux_scale)
-    # mp.plot(data_1d)
-
-    # add extra lines
-    extre_lines_num = 3
-    unused_peaks = np.sort(rng.random(extre_lines_num)) * nx
-    unused_str = rng.random(extre_lines_num)
-    for peak, strength in zip(unused_peaks, unused_str):
-        data_1d += gaussian(np.arange(nx), peak, fwhm, strength * flux_scale)
-
-    # add continuum:
-    data_1d += gaussian(np.arange(nx), nx // 2, nx // 10, flux_scale / 10)
-
-    # Set the dispersion and some minor distortion
-
-    # add noise to the spectrum
-    noise_level = 30
-    bias = 5
-    data_1d += np.random.normal(bias, scale=noise_level, size=data_1d.shape)
-
-    # Cross correlate the spectrum
-    # Find the linear part of the wavelength solution
-
-    # mp.plot(data_1d)
-    # mp.show()
-    pass
 
 
 def test_linear_wavelength_solution():
@@ -89,7 +38,7 @@ def test_linear_wavelength_solution():
     dispersion = 2.5
     line_width = 3
     input_spectrum, lines, test_lines = build_random_spectrum(min_wavelength=min_wavelength, dispersion=dispersion,
-                                                              line_width=line_width)
+                                                              line_sigma=line_width)
 
     linear_model = linear_wavelength_solution(input_spectrum, 0.01 * np.ones_like(input_spectrum), lines,
                                               dispersion, line_width, np.arange(4000, 5001))
@@ -101,7 +50,7 @@ def test_identify_peaks():
     seed = 76856
     line_width = 3
     line_sep = 10
-    input_spectrum, lines, test_lines = build_random_spectrum(seed=seed, line_width=line_width)
+    input_spectrum, lines, test_lines = build_random_spectrum(seed=seed, line_sigma=line_width, nlines=6)
 
     recovered_peaks = identify_peaks(input_spectrum, 0.01 * np.ones_like(input_spectrum), line_width, line_sep)
 
@@ -116,7 +65,7 @@ def test_correlate_peaks():
     line_width = 3
     used_lines = 6
     input_spectrum, lines, test_peaks = build_random_spectrum(min_wavelength=min_wavelength, dispersion=dispersion,
-                                                              line_width=line_width)
+                                                              line_sigma=line_width)
 
     linear_model = linear_wavelength_solution(input_spectrum, 0.01 * np.ones_like(input_spectrum), lines,
                                               dispersion, line_width, np.arange(4000, 5001))
@@ -147,23 +96,49 @@ def test_refine_peak_centers():
     seed = 75827
     line_width = 3
     line_sep = 10
-    input_spectrum, lines, test_lines = build_random_spectrum(seed=seed, line_width=line_width)
+    input_spectrum, lines, test_lines = build_random_spectrum(seed=seed, line_sigma=line_width)
 
     recovered_peaks = identify_peaks(input_spectrum, 0.01 * np.ones_like(input_spectrum), line_width, line_sep)
 
     fit_list = refine_peak_centers(input_spectrum, 0.01 * np.ones_like(input_spectrum), recovered_peaks, line_width)
 
-    # x_pixels = np.linspace(0, input_spectrum.size, 10000)
-    # fit_spectrum = np.zeros(x_pixels.size)
-    # for fit in fit_list:
-    #     fit_spectrum += gauss(x_pixels, fit[0], fit[1], fit[2])
-    # for peak in recovered_peaks:
-    #     mp.plot([peak, peak], [-10, 200], color='red')
-    #     mp.plot(input_spectrum)
-    #     mp.plot(x_pixels, fit_spectrum, color="green")
-    #     mp.xlim([peak-15, peak+15])
-    #     mp.show()
-
     # Need to figure out how to handle blurred lines and overlapping peaks.
     for fit in fit_list:
-        assert np.min(abs(test_lines - fit[0])) < 1
+        assert np.min(abs(test_lines - fit)) < 1
+
+
+def test_2d_wavelength_solution():
+    nx = 501
+    data = np.zeros((512, nx))
+    error = np.ones((512, nx))
+    order_center = 151
+    input_center_params = [order_center, 10, 20]
+    order_height = 85
+    trace_center = Legendre(input_center_params, domain=(0, data.shape[1] - 1))
+    input_order_region = order_region(order_height, trace_center, data.shape)
+
+    min_wavelength = 3200.0
+    seed = 76856
+    line_width = 3 * (2 * np.sqrt(2 * np.log(2)))
+    dispersion = 2.5
+    tilt = 15  # degrees
+    input_spectrum, lines, test_lines = build_random_spectrum(seed=seed, line_sigma=3,
+                                                              dispersion=dispersion, nlines=6, nx=nx)
+    x1d = np.arange(data.shape[1], dtype=float)
+    x2d, y2d = np.meshgrid(x1d, np.arange(data.shape[0], dtype=float))
+    tilted_x = x2d + (y2d - trace_center(x1d)) * np.tan(np.deg2rad(tilt))
+    data[input_order_region] = np.interp(tilted_x[input_order_region], x1d, input_spectrum)
+    error[data >= 1.0] = 0.01 * data[data >= 1.0]
+
+    # Convert between poly1d and legendre conventions
+    converted_input_polynomial = Legendre((min_wavelength, dispersion), domain=(0, data.shape[1] - 1),
+                                          window=(0, data.shape[1] - 1)).convert(domain=(0, data.shape[1] - 1))
+    params = full_wavelength_solution(data[input_order_region], error[input_order_region], x2d[input_order_region],
+                                      (y2d - trace_center(x1d))[input_order_region], converted_input_polynomial.coef,
+                                      tilt, 2.5 * line_width, lines)
+
+    fit_tilt, fit_line_width, *fit_polynomial_coefficients = params
+    # Assert that the best fit parameters are close to the inputs
+    np.testing.assert_allclose(tilt, fit_tilt, atol=0.1)
+    np.testing.assert_allclose(2.5 * line_width, fit_line_width, atol=0.3)
+    np.testing.assert_allclose(converted_input_polynomial.coef, fit_polynomial_coefficients, atol=0.1)

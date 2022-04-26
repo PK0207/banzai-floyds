@@ -336,6 +336,8 @@ def maximize_match_filter(initial_guess, data, error, weights_function, x, weigh
     Depending on if the Jacbian and Hessian functions are included, we choose our minimization algorithm based on this:
     https://scipy-lectures.org/advanced/mathematical_optimization/#choosing-a-method
     """
+    if args is None:
+        args = ()
     if weights_hessian_function is None and weights_jacobian_function is None:
         best_fit = minimize(lambda *params: -matched_filter_metric(*params), initial_guess,
                             args=(data, error, weights_function, weights_jacobian_function, weights_hessian_function, x,

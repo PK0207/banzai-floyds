@@ -1,5 +1,6 @@
 import numpy as np
 from numpy.polynomial.legendre import Legendre
+from banzai.stages import Stage
 from banzai_floyds.matched_filter import matched_filter_metric
 from scipy.signal import find_peaks
 from banzai_floyds.matched_filter import maximize_match_filter
@@ -153,6 +154,14 @@ def correlate_peaks(peaks, linear_model, lines, match_threshold):
 
 
 def estimate_distortion(peaks, corresponding_wavelengths, domain, order=4):
+    """
+
+    :param peaks: list of detected peaks in Pixel coordinates
+    :param corresponding_wavelengths: list of peaks in physical units
+    :param domain: tuple with minimum and maximum x value for given order
+    :param order: int order of fitting polynomial
+    :return:
+    """
     return Legendre.fit(deg=order, x=peaks, y=corresponding_wavelengths, domain=domain)
 
 
@@ -205,3 +214,19 @@ def full_wavelength_solution(data, error, x, y, initial_polynomial_coefficients,
     best_fit_params = maximize_match_filter((initial_tilt, initial_line_width, *initial_polynomial_coefficients), data,
                                             error, full_wavelength_solution_weights, (x, y), args=(lines,))
     return best_fit_params
+
+
+class CalibrateWavelengths(Stage):
+    """
+    Stage that uses Arcs to fit wavelength solution
+    """
+    def do_stage(self, image):
+        # for order in orders:
+            # if no previous wavelength solution calculate it
+                # copy order centers and get mask for height of a few extract median along axis=0
+                # from 1D estimate linear solution
+                # Estimate 1D distortion with higher order polynomials
+            # Otherwise load wavelength solution
+            # Fit 2D wavelength solution using initial guess either loaded or from 1D extraction
+            # store fit info in table
+            # evaluate wavelength solution at all pixels in 2D order

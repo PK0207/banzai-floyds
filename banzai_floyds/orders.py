@@ -432,3 +432,5 @@ class OrderSolver(Stage):
         image.is_master = True
 
         return image
+
+# TODO: Add Get Trace Region

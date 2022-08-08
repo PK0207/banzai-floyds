@@ -2,6 +2,7 @@ from banzai.lco import LCOObservationFrame, LCOFrameFactory, LCOCalibrationFrame
 from typing import Optional
 from banzai.frames import ObservationFrame
 from banzai_floyds.orders import Orders
+from banzai_floyds.utils.wavelength_utils import WavelengthSolution
 import numpy as np
 
 
@@ -16,6 +17,7 @@ class FLOYDSCalibrationFrame(LCOCalibrationFrame, FLOYDSObservationFrame):
                  hdu_order: list = None):
         LCOCalibrationFrame.__init__(self, hdu_list, file_path,  grouping_criteria=grouping_criteria)
         FLOYDSObservationFrame.__init__(self, hdu_list, file_path, frame_id=frame_id, hdu_order=hdu_order)
+        self._wavelengths = None
 
     def write(self, runtime_context):
         LCOCalibrationFrame.write(self, runtime_context)
@@ -51,4 +53,6 @@ class FLOYDSFrameFactory(LCOFrameFactory):
             models = [np.polynomial.legendre.Legendre(coeff_set, domain=domain)
                       for coeff_set, domain in zip(coeffs, domains)]
             image.orders = Orders(models, image.data.shape, image['ORDER_COEFFS'].meta['HEIGHT'])
+        if 'WAVELENGTHS' in image:
+            image.wavelengths = WavelengthSolution.from_header(image['WAVELENGTHS'].meta)
         return image

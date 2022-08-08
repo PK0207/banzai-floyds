@@ -1,9 +1,16 @@
 import numpy as np
 from numpy.polynomial.legendre import Legendre
 from banzai.stages import Stage
+from banzai.calibrations import CalibrationUser
 from banzai_floyds.matched_filter import matched_filter_metric
 from scipy.signal import find_peaks
 from banzai_floyds.matched_filter import maximize_match_filter
+from banzai_floyds.frames import FLOYDSCalibrationFrame
+from banzai.data import ArrayData
+from banzai_floyds.utils.wavelength_utils import WavelengthSolution
+from banzai_floyds.utils.order_utils import get_order_2d_region
+from banzai_floyds import arc_lines
+from astropy.table import Table
 
 
 def gauss(x, mu, sigma):
@@ -216,17 +223,98 @@ def full_wavelength_solution(data, error, x, y, initial_polynomial_coefficients,
     return best_fit_params
 
 
+class WavelengthSolutionLoader(CalibrationUser):
+    """
+    Loads the wavelengths from the nearest Arc lamp (wavelength calibration) in the db.
+    """
+    @property
+    def calibration_type(self):
+        return 'ARC'
+
+    def on_missing_master_calibration(self, image):
+        if image.obstype.upper() == 'ARC':
+            return image
+        else:
+            super(WavelengthSolutionLoader, self).on_missing_master_calibration(image)
+
+    def apply_master_calibration(self, image: FLOYDSCalibrationFrame, super_calibration_image):
+        image.wavelengths = super_calibration_image.wavelengths
+        image.meta['L1IDARC'] = super_calibration_image.filename, 'ID of ARC/DOUBLE frame'
+        return image
+
+
+def load_line_list():
+    return Table(arc_lines.used_lines)
+
+
 class CalibrateWavelengths(Stage):
+    EXTRACTION_HEIGHT = 5
+    LINES = load_line_list()
+    # All in angstroms, measured by Joey Chatelain
+    INITIAL_LINE_WIDTHS = {1: 11.0, 2: 22.0}
+    INITIAL_DISPERSIONS = {1: 1.71, 2: 3.47}
+    # Tilts in degrees measured counterclockwise (right-handed coordinates)
+    INITIAL_LINE_TILTS = {1: 9., 2: 9.}
+    OFFSET_RANGES = {1: [4300, 4600], 2: [8200.0, 8500.0]}
+    MATCH_THRESHOLDS = {1: 10.0, 2: 10.0}
+    MIN_LINE_SEPARATIONS = {1: 20.0, 2: 20.0}
     """
     Stage that uses Arcs to fit wavelength solution
     """
     def do_stage(self, image):
-        # for order in orders:
+        orders = np.unique(image.orders)
+        if image.wavelengths is None:
             # if no previous wavelength solution calculate it
+            initial_wavelength_solutions = []
+            for order in orders:
                 # copy order centers and get mask for height of a few extract median along axis=0
+                extraction_orders = image.orders.copy()
+                extraction_orders._order_height = self.EXTRACTION_HEIGHT
+                order_region = get_order_2d_region(extraction_orders.data == order)
+                flux_1d = np.median(image.data[order_region], axis=0)
+                flux_1d_error = np.sqrt(image.error[order_region]) / float(extraction_orders._order_height)
+                linear_solution = linear_wavelength_solution(flux_1d, flux_1d_error, self.LINES,
+                                                             self.INITIAL_DISPERSIONS[order],
+                                                             self.INITIAL_LINE_WIDTHS[order],
+                                                             self.OFFSET_RANGES[order])
                 # from 1D estimate linear solution
                 # Estimate 1D distortion with higher order polynomials
-            # Otherwise load wavelength solution
+                peaks = identify_peaks(flux_1d, flux_1d_error, self.INITIAL_LINE_WIDTHS[order],
+                                       self.MIN_LINE_SEPARATIONS[order])
+                peaks = refine_peak_centers(flux_1d, flux_1d_error, peaks, self.INITIAL_LINE_WIDTHS[order])
+                corresponding_lines = correlate_peaks(peaks, linear_solution, self.INITIAL_LINE_WIDTHS[order],
+                                                      self.MATCH_THRESHOLDS[order])
+                initial_wavelength_solutions.append(estimate_distortion(peaks, corresponding_lines,
+                                                                        image.orders.domains[order], order=4))
+            image.wavelengths = WavelengthSolution(initial_wavelength_solutions,
+                                                   [self.INITIAL_LINE_WIDTHS[order] for order in orders],
+                                                   [self.INITIAL_LINE_TILTS[order] for order in orders])
+
+        best_fit_polynomials = []
+        best_fit_tilts = []
+        best_fit_widths = []
+        for order, input_coefficients, input_tilt, input_width in zip(orders, image.wavelengths.coefficients,
+                                                                      image.wavelengths.line_tilts,
+                                                                      image.wavelengths.line_widths):
+            x2d, y2d = np.meshgrid(np.arange(image.data.shape[1]), np.arange(image.data.shape[0]))
+
             # Fit 2D wavelength solution using initial guess either loaded or from 1D extraction
-            # store fit info in table
+            tilt, width, coefficients = full_wavelength_solution(image.data[image.orders.data == order],
+                                                                 image.error[image.orders.data == order],
+                                                                 x2d[image.orders.data == order],
+                                                                 y2d[image.orders.data == order],
+                                                                 input_coefficients, input_tilt, input_width,
+                                                                 self.LINES)
             # evaluate wavelength solution at all pixels in 2D order
+            # TODO: Make sure that the domain here doesn't mess up the tilts
+            polynomial = Legendre(coefficients, domain=(min(x2d[image.orders.data == order]),
+                                                        max(x2d[image.orders.data == order])))
+
+            best_fit_polynomials.append(polynomial)
+            best_fit_tilts.append(tilt)
+            best_fit_widths.append(width)
+
+        image.wavelengths = WavelengthSolution(best_fit_polynomials, best_fit_widths, best_fit_tilts)
+        image['WAVELENGTHS'] = ArrayData(image.wavelengths.data(image.orders.data),
+                                         meta=image.wavelengths.to_header(),
+                                         name='wavelength')

@@ -12,7 +12,8 @@ def build_random_spectrum(seed=None, min_wavelength=3200, line_sigma=3, dispersi
         np.random.seed(seed)
     lines = Table({'wavelength': np.random.uniform(low=3500.0, high=5500.0, size=nlines),
                    'strength': np.random.uniform(low=0.0, high=1.0, size=nlines),
-                   'line_source': ['Hg', 'Zn'] * (nlines // 2)
+                   'line_source': ['Hg', 'Zn'] * (nlines // 2),
+                   'used': [True] * nlines
                    },)
 
     input_spectrum = np.zeros(nx)

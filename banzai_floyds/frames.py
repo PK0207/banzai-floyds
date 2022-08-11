@@ -17,7 +17,7 @@ class FLOYDSCalibrationFrame(LCOCalibrationFrame, FLOYDSObservationFrame):
                  hdu_order: list = None):
         LCOCalibrationFrame.__init__(self, hdu_list, file_path,  grouping_criteria=grouping_criteria)
         FLOYDSObservationFrame.__init__(self, hdu_list, file_path, frame_id=frame_id, hdu_order=hdu_order)
-        self._wavelengths = None
+        self.wavelengths = None
 
     def write(self, runtime_context):
         LCOCalibrationFrame.write(self, runtime_context)

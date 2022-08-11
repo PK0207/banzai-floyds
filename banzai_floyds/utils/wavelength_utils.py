@@ -10,10 +10,13 @@ class WavelengthSolution:
         self._line_tilts = line_tilts
 
     def data(self, orders):
-        model_wavelengths = np.zeros_like(orders)
+        model_wavelengths = np.zeros_like(orders).astype(float)
         # Recall that numpy arrays are indexed y,x
         x2d, y2d = np.meshgrid(np.arange(orders.shape[1]), np.arange(orders.shape[0]))
-        for i, order in enumerate(np.unique(orders)):
+
+        order_ids = np.unique(orders)
+        order_ids = order_ids[order_ids != 0]
+        for i, order in enumerate(order_ids):
             tilted_x = x2d + np.tan(np.deg2rad(self._line_tilts[i])) * y2d
             model_wavelengths[orders == order] += self._polynomials[i](tilted_x[orders == order])
         return model_wavelengths
@@ -23,8 +26,8 @@ class WavelengthSolution:
         for i, (polynomial, width, tilt) in enumerate(zip(self._polynomials, self._line_widths, self._line_tilts)):
             header[f'LINWIDE{i + 1}'] = width
             header[f'LINTILT{i + 1}'] = tilt
-            header[f'POLYORD{i + 1}'] = polynomial.order
-            header[f'POLYDOM{i + 1}'] = polynomial.domain
+            header[f'POLYORD{i + 1}'] = polynomial.degree()
+            header[f'POLYDOM{i + 1}'] = str(list(polynomial.domain))
             for j, coef in enumerate(polynomial.coef):
                 header[f'COEF{i + 1}_{j}'] = coef
         return header

@@ -31,7 +31,8 @@ used_lines = [{'wavelength': 3650.158, 'line_strength': 0.0556, 'line_source': '
               {'wavelength': 10139.75, 'line_strength': 0.005, 'line_source': 'Hg', 'line_notes': ''},
               ]
 
-unused_lines = [{'wavelength': 3451.689, 'line_strength': 'nan', 'line_source': 'Hg', 'line_notes': 'No flux in FLOYDS'},
+unused_lines = [{'wavelength': 3451.689, 'line_strength': 'nan', 'line_source': 'Hg',
+                 'line_notes': 'No flux in FLOYDS'},
                 {'wavelength': 3654.842, 'line_strength': 'nan', 'line_source': 'Hg', 'line_notes': ''},
                 {'wavelength': 3663.2793, 'line_strength': 0.0064, 'line_source': 'Hg', 'line_notes': 'blend'},
                 {'wavelength': 4339.2232, 'line_strength': 'nan', 'line_source': 'Hg', 'line_notes': 'Weak line'},
@@ -55,14 +56,17 @@ unused_lines = [{'wavelength': 3451.689, 'line_strength': 'nan', 'line_source': 
                 {'wavelength': 6827.2529, 'line_strength': 'nan', 'line_source': 'ArI', 'line_notes': ''},
                 {'wavelength': 6937.6642, 'line_strength': 'nan', 'line_source': 'ArI', 'line_notes': ''},
                 {'wavelength': 7206.9804, 'line_strength': 'nan', 'line_source': 'ArI', 'line_notes': ''},
-                {'wavelength': 7372.1184, 'line_strength': 'nan', 'line_source': 'ArI', 'line_notes': 'Blended in FLOYDS'},
+                {'wavelength': 7372.1184, 'line_strength': 'nan', 'line_source': 'ArI',
+                 'line_notes': 'Blended in FLOYDS'},
                 {'wavelength': 7383.9805, 'line_strength': 0.1489, 'line_source': 'ArI',
                  'line_notes': 'Blended in FLOYDS'},
                 {'wavelength': 7503.8691, 'line_strength': 0.253, 'line_source': 'ArI',
                  'line_notes': 'Blended in FLOYDS'},
-                {'wavelength': 7514.6518, 'line_strength': 'nan', 'line_source': 'ArI', 'line_notes': 'Blended in FLOYDS'},
+                {'wavelength': 7514.6518, 'line_strength': 'nan', 'line_source': 'ArI',
+                 'line_notes': 'Blended in FLOYDS'},
                 {'wavelength': 7723.7599, 'line_strength': 0.3542, 'line_source': 'ArI', 'line_notes': 'Blend'},
-                {'wavelength': 8006.1567, 'line_strength': 'nan', 'line_source': 'ArI', 'line_notes': 'Blended in FLOYDS'},
+                {'wavelength': 8006.1567, 'line_strength': 'nan', 'line_source': 'ArI',
+                 'line_notes': 'Blended in FLOYDS'},
                 {'wavelength': 8014.7857, 'line_strength': 0.2952, 'line_source': 'ArI',
                  'line_notes': 'Blended in FLOYDS'},
                 {'wavelength': 8103.6931, 'line_strength': 'nan', 'line_source': 'ArI',
@@ -83,9 +87,12 @@ unused_lines = [{'wavelength': 3451.689, 'line_strength': 'nan', 'line_source': 
                 {'wavelength': 10506.47, 'line_strength': 'nan', 'line_source': 'ArI', 'line_notes': ''},
                 {'wavelength': 10673.55, 'line_strength': 'nan', 'line_source': 'ArI',
                  'line_notes': 'Too weak to get a reliable centroid'},
-                {'wavelength': 10950.74, 'line_strength': 'nan', 'line_source': 'ArI', 'line_notes': 'No flux in FLOYDS'},
-                {'wavelength': 11078.87, 'line_strength': 'nan', 'line_source': 'ArI', 'line_notes': 'No flux in FLOYDS'},
-                {'wavelength': 11106.44, 'line_strength': 'nan', 'line_source': 'ArI', 'line_notes': 'No flux in FLOYDS'}
+                {'wavelength': 10950.74, 'line_strength': 'nan', 'line_source': 'ArI',
+                 'line_notes': 'No flux in FLOYDS'},
+                {'wavelength': 11078.87, 'line_strength': 'nan', 'line_source': 'ArI',
+                 'line_notes': 'No flux in FLOYDS'},
+                {'wavelength': 11106.44, 'line_strength': 'nan', 'line_source': 'ArI',
+                 'line_notes': 'No flux in FLOYDS'}
                 ]
 
 

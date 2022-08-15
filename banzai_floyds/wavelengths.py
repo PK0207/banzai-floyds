@@ -286,7 +286,7 @@ class CalibrateWavelengths(Stage):
                 successful_matches = np.isfinite(corresponding_lines)
                 initial_wavelength_solutions.append(estimate_distortion(peaks[successful_matches],
                                                                         corresponding_lines[successful_matches],
-                                                                        image.orders.domains[order-1], order=4))
+                                                                        image.orders.domains[order], order=4))
             image.wavelengths = WavelengthSolution(initial_wavelength_solutions,
                                                    [self.INITIAL_LINE_WIDTHS[order] for order in orders],
                                                    [self.INITIAL_LINE_TILTS[order] for order in orders])

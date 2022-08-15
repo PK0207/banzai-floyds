@@ -43,18 +43,18 @@ class Orders:
         """
         Returns
         -------
-        List of coefficients for each model
+        Dictionary of order:coefficients for each model
         """
-        return [model.coef for model in self._models]
+        return dict([(i+1, model.coef) for i, model in enumerate(self._models)])
 
     @property
     def domains(self):
         """
         Returns
         -------
-        List of tuples with the min/max of fit domain
+        Dictionary of order:tuples with the min/max of fit domain
         """
-        return [model.domain for model in self._models]
+        return dict([(i+1, model.domain) for i, model in enumerate(self._models)])
 
 
 def tophat_filter_metric(data, error, region):
@@ -414,11 +414,11 @@ class OrderSolver(Stage):
             order_curves.append(order_curve)
         image.orders = Orders(order_curves, image.data.shape, self.ORDER_HEIGHT)
         image.add_or_update(ArrayData(image.orders.data, name='ORDERS'))
-        coeff_table = [{f'c{i}': coeff for i, coeff in enumerate(coefficient_set)}
-                       for coefficient_set in image.orders.coeffs]
+        coeff_table = [{f'c{i}': coeff for i, coeff in enumerate(image.orders.coeffs[order])}
+                       for order in image.orders.coeffs]
         for i, row in enumerate(coeff_table):
             row['order'] = i + 1
-            row['domainmin'], row['domainmax'] = image.orders.domains[i]
+            row['domainmin'], row['domainmax'] = image.orders.domains[i + 1]
         coeff_table = Table(coeff_table)
         coeff_table['order'].description = 'ID of order'
         coeff_table['domainmin'].description = 'Domain minimum for the order curve'

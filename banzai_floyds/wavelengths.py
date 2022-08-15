@@ -270,8 +270,8 @@ class CalibrateWavelengths(Stage):
                 extraction_orders._order_height = self.EXTRACTION_HEIGHT
                 order_region = get_order_2d_region(extraction_orders.data == order)
                 flux_1d = np.median(image.data[order_region], axis=0)
-                flux_1d_error = np.median(np.sqrt(image.uncertainty[order_region]) /
-                                          float(extraction_orders._order_height), axis=0)
+                flux_1d_error = np.sqrt(np.sum((np.sqrt(image.uncertainty[order_region]) /
+                                                float(extraction_orders._order_height)) ** 2, axis=0))
                 linear_solution = linear_wavelength_solution(flux_1d, flux_1d_error, self.LINES,
                                                              self.INITIAL_DISPERSIONS[order],
                                                              self.INITIAL_LINE_WIDTHS[order],

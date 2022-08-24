@@ -1,9 +1,15 @@
 from banzai_floyds.wavelengths import gauss, linear_wavelength_solution, identify_peaks, correlate_peaks,\
-    refine_peak_centers, full_wavelength_solution
+    refine_peak_centers, full_wavelength_solution, CalibrateWavelengths
 import numpy as np
 from astropy.table import Table
 from numpy.polynomial.legendre import Legendre
 from banzai_floyds.orders import order_region
+from banzai import context
+from banzai_floyds.orders import Orders
+from banzai_floyds import arc_lines
+from banzai_floyds.frames import FLOYDSObservationFrame
+from banzai.data import CCDData
+from astropy.io import fits
 
 
 def build_random_spectrum(seed=None, min_wavelength=3200, line_sigma=3, dispersion=2.5, nlines=10, nx=1001):
@@ -144,3 +150,77 @@ def test_2d_wavelength_solution():
     np.testing.assert_allclose(tilt, fit_tilt, atol=0.1)
     np.testing.assert_allclose(dispersion * line_width, fit_line_width, atol=0.3)
     np.testing.assert_allclose(converted_input_polynomial.coef, fit_polynomial_coefficients, atol=0.1)
+
+
+def generate_fake_arc_frame():
+    nx = 2048
+    ny = 512
+    order_height = 93
+    order1 = Legendre((128.7, 71, 43, -9.5), domain=(0.0, 1600.0))
+    order2 = Legendre((410, 17, 63, -12), domain=(475.0, 1975.0))
+    data = np.zeros((ny, nx))
+    errors = np.zeros_like(data)
+    orders = Orders([order1, order2], (ny, nx), order_height)
+
+    # make a reasonable wavelength model
+    wavelength_model1 = Legendre((8371., 3605., 20., -5., 1.), domain=(0.0, 1600.0))
+    wavelength_model2 = Legendre((4455., 1522., 35., -12., 1.5), domain=(475.0, 1975.0))
+    line_widths = (22., 11.)
+    line_tilts = (9, 9)
+    dispersions = (3.47, 1.71)
+    flux_scale = 8000.0
+    read_noise = 7.0
+
+    # Calculate the tilted coordinates
+    x2d, y2d = np.meshgrid(np.arange(nx), np.arange(ny))
+    for order_center, wavelength_model, tilt, line_width, dispersion in \
+            zip((order1, order2),
+                (wavelength_model1, wavelength_model2),
+                line_tilts,
+                line_widths,
+                dispersions):
+        input_order_region = order_region(order_height, order_center, (ny, nx))
+        tilted_x = x2d + (y2d - order_center(x2d)) * np.tan(np.deg2rad(tilt))
+
+        # Fill in both used and unused lines that have strengths, setting a reasonable signal to noise
+        lines = arc_lines.used_lines + arc_lines.unused_lines
+        for line in lines:
+            if line['line_strength'] == 'nan':
+                continue
+            roots = (wavelength_model - line['wavelength']).roots()
+            in_order = np.logical_and(np.isreal(roots),
+                                      np.logical_and(roots > 0, roots < max(tilted_x[input_order_region])))
+            if any(in_order):
+                peak_center = np.real_if_close(roots[in_order])
+            else:
+                continue
+            line_sigma = line_width / dispersion / (2.0 * np.sqrt(2.0 * np.log(2.0)))
+            data[input_order_region] += line['line_strength'] * gauss(tilted_x[input_order_region],
+                                                                      peak_center, line_sigma) * flux_scale
+    # Add poisson noise
+    errors += np.sqrt(data)
+    data = np.random.poisson(data).astype(float)
+
+    # Add read noise
+    errors = np.sqrt(errors * errors + read_noise)
+    data += np.random.normal(0.0, read_noise, size=(ny, nx))
+    # save the data, errors, and orders to a floyds frame
+    frame = FLOYDSObservationFrame([CCDData(data, fits.Header({}), uncertainty=errors)], 'foo.fits')
+    frame.orders = orders
+    # return the test frame and the input wavelength solution
+    return frame, {'models': [wavelength_model1, wavelength_model2], 'tilts': line_tilts, 'widths': line_widths}
+
+
+def test_full_wavelength_solution():
+    input_context = context.Context({})
+    frame, input_wavelength_solution = generate_fake_arc_frame()
+    stage = CalibrateWavelengths(input_context)
+    frame = stage.do_stage(frame)
+    for fit_coefficients, input_coefficients in zip(frame.wavelengths.coefficients,
+                                                    [polynomial.coef
+                                                     for polynomial in input_wavelength_solution['models']]):
+        np.testing.assert_allclose(fit_coefficients, input_coefficients, rtol=0.1)
+    for fit_width, input_width in zip(frame.wavelengths.line_widths, input_wavelength_solution['widths']):
+        np.testing.assert_allclose(fit_width, input_width, atol=0.3)
+    for fit_tilt, input_tilt, in zip(frame.wavelengths.line_tilts, input_wavelength_solution['tilts']):
+        np.testing.assert_allclose(fit_tilt, input_tilt, atol=0.1)

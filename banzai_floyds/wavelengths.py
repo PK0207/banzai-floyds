@@ -40,7 +40,7 @@ def wavelength_model_weights(theta, x, lines, line_width):
     return weights
 
 
-def linear_wavelength_solution(data, error, lines, dispersion, line_width, offset_range):
+def linear_wavelength_solution(data, error, lines, dispersion, line_width, offset_range, domain=None):
     """
     Get best fit first-order wavelength solution
 
@@ -55,21 +55,24 @@ def linear_wavelength_solution(data, error, lines, dispersion, line_width, offse
     line_width: average line width in angstroms
     offset_range: list
         Range of values to search for the offset in the linear wavelength solution
-
+    domain: tuple
+        min and max x-values of the order
     Returns
     -------
     linear model function that takes an array of pixels and outputs wavelengths
     """
+    if domain is None:
+        domain = (0, len(data) - 1)
     # Step the model spectrum metric through each of the offsets and find the peak
     slope = dispersion * (len(data) // 2)
     metrics = [matched_filter_metric((offset, slope), data, error, wavelength_model_weights, None, None,
                                      np.arange(data.size), lines, line_width) for offset in offset_range]
     best_fit_offset = offset_range[np.argmax(metrics)]
 
-    return Legendre((best_fit_offset, slope), domain=(0, len(data) - 1))
+    return Legendre((best_fit_offset, slope), domain=domain)
 
 
-def identify_peaks(data, error, line_width, line_sep):
+def identify_peaks(data, error, line_width, line_sep, domain=None):
     """
         Detect peaks in spectrum extraction
 
@@ -78,13 +81,17 @@ def identify_peaks(data, error, line_width, line_sep):
         data: array of 1D raw spectrum extraction
         error: array of uncertainties
                 Same shapes as the input data array
-        line_width: average line width (fwhm) in angstroms
-        line_sep: minimum separation distance before lines are determined to be unique
+        line_width: average line width (fwhm) in pixels
+        line_sep: minimum separation distance before lines are determined to be unique in pixels
+        domain: tuple
+            min and max x-values of the order
 
         Returns
         -------
         array containing the location of detected peaks
         """
+    if domain is None:
+        domain = (0, len(data) - 1)
     # extract peak locations
     # Assume +- 3 sigma for the kernel width
     kernel_half_width = int(3 * line_width / 2.355)
@@ -95,7 +102,8 @@ def identify_peaks(data, error, line_width, line_sep):
     normalization = np.convolve(kernel * kernel, 1.0 / error / error, mode='same')
 
     metric = signal / normalization
-    peaks, peak_properties = find_peaks(metric, height=50.0, distance=line_sep)
+    peaks, peak_properties = find_peaks(metric, height=100.0, distance=line_sep)
+    peaks += int(min(domain))
     return peaks
 
 
@@ -105,7 +113,7 @@ def centroiding_weights(theta, x):
     return gauss(x, center, sigma)
 
 
-def refine_peak_centers(data, error, peaks, line_width):
+def refine_peak_centers(data, error, peaks, line_width, domain=None):
     """
         Find a precise center and width based on a gaussian fit to data
 
@@ -119,19 +127,22 @@ def refine_peak_centers(data, error, peaks, line_width):
 
         Returns
         -------
-        list of refined centers for each peak
+        array of refined centers for each peak
     """
+    if domain is None:
+        domain = (0, len(data) - 1)
     line_sigma = line_width / 2.355
     half_fit_window = int(3 * line_sigma)
     centers = []
-    for peak in peaks:
-        window = slice(peak - half_fit_window, peak + half_fit_window + 1, 1)
+    for peak in peaks - min(domain):
+        window = slice(int(peak - half_fit_window), int(peak + half_fit_window + 1), 1)
         data_window = data[window]
         error_window = error[window]
         x = np.arange(-half_fit_window, half_fit_window + 1, dtype=float)
         best_fit_center, best_fit_line_width = maximize_match_filter((0, line_width), data_window, error_window,
                                                                      centroiding_weights, x)
         centers.append(best_fit_center + peak)
+    centers = np.array(centers) + min(domain)
     return centers
 
 
@@ -247,14 +258,16 @@ class WavelengthSolutionLoader(CalibrationUser):
 class CalibrateWavelengths(Stage):
     EXTRACTION_HEIGHT = 5
     LINES = arc_lines_table()
-    # All in angstroms, measured by Joey Chatelain
-    INITIAL_LINE_WIDTHS = {1: 11.0, 2: 22.0}
-    INITIAL_DISPERSIONS = {1: 1.71, 2: 3.47}
+    # All in angstroms, measured by Curtis McCully based on initial fits by Joey Chatelain
+    INITIAL_LINE_WIDTHS = {1: 22.0, 2: 11.0}
+    INITIAL_DISPERSIONS = {1: 4.506, 2: 2.03}
     # Tilts in degrees measured counterclockwise (right-handed coordinates)
     INITIAL_LINE_TILTS = {1: 9., 2: 9.}
-    OFFSET_RANGES = {1: [4300, 4600], 2: [8200.0, 8500.0]}
+    OFFSET_RANGES = {1: np.arange(8200.0, 8500.0, 0.5), 2: np.arange(4300, 4600, 0.5)}
     MATCH_THRESHOLDS = {1: 10.0, 2: 10.0}
+    # In pixels
     MIN_LINE_SEPARATIONS = {1: 5.0, 2: 5.0}
+    FIT_ORDERS = {1: 4, 2: 2}
     """
     Stage that uses Arcs to fit wavelength solution
     """
@@ -269,24 +282,31 @@ class CalibrateWavelengths(Stage):
                 extraction_orders = copy(image.orders)
                 extraction_orders._order_height = self.EXTRACTION_HEIGHT
                 order_region = get_order_2d_region(extraction_orders.data == order)
+                # Note that his flux has an x origin at the x = 0 instead of the domain of the order
+                # I don't think it matters though
                 flux_1d = np.median(image.data[order_region], axis=0)
                 flux_1d_error = np.sqrt(np.sum((np.sqrt(image.uncertainty[order_region]) /
                                                 float(extraction_orders._order_height)) ** 2, axis=0))
                 linear_solution = linear_wavelength_solution(flux_1d, flux_1d_error, self.LINES,
                                                              self.INITIAL_DISPERSIONS[order],
                                                              self.INITIAL_LINE_WIDTHS[order],
-                                                             self.OFFSET_RANGES[order])
+                                                             self.OFFSET_RANGES[order],
+                                                             domain=image.orders.domains[order])
                 # from 1D estimate linear solution
                 # Estimate 1D distortion with higher order polynomials
-                peaks = identify_peaks(flux_1d, flux_1d_error, self.INITIAL_LINE_WIDTHS[order],
-                                       self.MIN_LINE_SEPARATIONS[order])
-                peaks = np.array(refine_peak_centers(flux_1d, flux_1d_error, peaks, self.INITIAL_LINE_WIDTHS[order]))
+                peaks = identify_peaks(flux_1d, flux_1d_error,
+                                       self.INITIAL_LINE_WIDTHS[order] / self.INITIAL_DISPERSIONS[order],
+                                       self.MIN_LINE_SEPARATIONS[order], domain=image.orders.domains[order])
+                peaks = refine_peak_centers(flux_1d, flux_1d_error, peaks,
+                                            self.INITIAL_LINE_WIDTHS[order] / self.INITIAL_DISPERSIONS[order],
+                                            domain=image.orders.domains[order])
                 corresponding_lines = np.array(correlate_peaks(peaks, linear_solution, self.LINES,
                                                                self.MATCH_THRESHOLDS[order])).astype(float)
                 successful_matches = np.isfinite(corresponding_lines)
                 initial_wavelength_solutions.append(estimate_distortion(peaks[successful_matches],
                                                                         corresponding_lines[successful_matches],
-                                                                        image.orders.domains[order], order=4))
+                                                                        image.orders.domains[order],
+                                                                        order=self.FIT_ORDERS[order]))
             image.wavelengths = WavelengthSolution(initial_wavelength_solutions,
                                                    [self.INITIAL_LINE_WIDTHS[order] for order in orders],
                                                    [self.INITIAL_LINE_TILTS[order] for order in orders])

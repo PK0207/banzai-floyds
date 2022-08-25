@@ -156,15 +156,15 @@ def generate_fake_arc_frame():
     nx = 2048
     ny = 512
     order_height = 93
-    order1 = Legendre((128.7, 71, 43, -9.5), domain=(0.0, 1600.0))
-    order2 = Legendre((410, 17, 63, -12), domain=(475.0, 1975.0))
+    order1 = Legendre((128.7, 71, 43, -9.5), domain=(0, 1600))
+    order2 = Legendre((410, 17, 63, -12), domain=(475, 1975))
     data = np.zeros((ny, nx))
     errors = np.zeros_like(data)
     orders = Orders([order1, order2], (ny, nx), order_height)
 
     # make a reasonable wavelength model
-    wavelength_model1 = Legendre((8371., 3605., 20., -5., 1.), domain=(0.0, 1600.0))
-    wavelength_model2 = Legendre((4455., 1522., 35., -12., 1.5), domain=(475.0, 1975.0))
+    wavelength_model1 = Legendre((8371., 3605., 20., -5., 1.), domain=(0, 1600))
+    wavelength_model2 = Legendre((4455., 1522., 35.), domain=(475, 1975))
     line_widths = (22., 11.)
     line_tilts = (9, 9)
     dispersions = (3.47, 1.71)

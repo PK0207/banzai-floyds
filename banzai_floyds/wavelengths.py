@@ -264,7 +264,7 @@ class CalibrateWavelengths(Stage):
     # Tilts in degrees measured counterclockwise (right-handed coordinates)
     INITIAL_LINE_TILTS = {1: 9., 2: 9.}
     OFFSET_RANGES = {1: np.arange(8200.0, 8500.0, 0.5), 2: np.arange(4300, 4600, 0.5)}
-    MATCH_THRESHOLDS = {1: 10.0, 2: 10.0}
+    MATCH_THRESHOLDS = {1: 10.0, 2: 20.0}
     # In pixels
     MIN_LINE_SEPARATIONS = {1: 5.0, 2: 5.0}
     FIT_ORDERS = {1: 4, 2: 2}
@@ -315,16 +315,17 @@ class CalibrateWavelengths(Stage):
         best_fit_tilts = []
         best_fit_widths = []
 
-        for order, input_coefficients, input_tilt, input_width in zip(orders, image.wavelengths.coefficients,
-                                                                      image.wavelengths.line_tilts,
-                                                                      image.wavelengths.line_widths):
+        for order, order_center, input_coefficients, input_tilt, input_width in \
+                zip(orders, image.orders._models, image.wavelengths.coefficients, image.wavelengths.line_tilts,
+                    image.wavelengths.line_widths):
             x2d, y2d = np.meshgrid(np.arange(image.data.shape[1]), np.arange(image.data.shape[0]))
 
+            tilt_ys = y2d[image.orders.data == order] - order_center(x2d[image.orders.data == order])
             # Fit 2D wavelength solution using initial guess either loaded or from 1D extraction
             tilt, width, *coefficients = full_wavelength_solution(image.data[image.orders.data == order],
                                                                   image.uncertainty[image.orders.data == order],
                                                                   x2d[image.orders.data == order],
-                                                                  y2d[image.orders.data == order],
+                                                                  tilt_ys,
                                                                   input_coefficients, input_tilt, input_width,
                                                                   self.LINES)
             # evaluate wavelength solution at all pixels in 2D order

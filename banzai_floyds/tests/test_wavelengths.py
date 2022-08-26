@@ -212,15 +212,24 @@ def generate_fake_arc_frame():
 
 
 def test_full_wavelength_solution():
+    np.random.seed(234132)
     input_context = context.Context({})
     frame, input_wavelength_solution = generate_fake_arc_frame()
     stage = CalibrateWavelengths(input_context)
     frame = stage.do_stage(frame)
-    for fit_coefficients, input_coefficients in zip(frame.wavelengths.coefficients,
-                                                    [polynomial.coef
-                                                     for polynomial in input_wavelength_solution['models']]):
-        np.testing.assert_allclose(fit_coefficients, input_coefficients, rtol=0.1)
     for fit_width, input_width in zip(frame.wavelengths.line_widths, input_wavelength_solution['widths']):
-        np.testing.assert_allclose(fit_width, input_width, atol=0.3)
+        np.testing.assert_allclose(fit_width, input_width, atol=0.1)
     for fit_tilt, input_tilt, in zip(frame.wavelengths.line_tilts, input_wavelength_solution['tilts']):
         np.testing.assert_allclose(fit_tilt, input_tilt, atol=0.1)
+
+    for fitted_model, input_model in zip(frame.wavelengths.polynomials, input_wavelength_solution['models']):
+        wavelength_differences = []
+        for line in arc_lines.used_lines:
+            roots = (input_model - line['wavelength']).roots()
+            in_order = np.logical_and(np.isreal(roots), np.logical_and(roots > 0, roots < max(fitted_model.domain)))
+            if any(in_order):
+                input_center = np.real_if_close(roots[in_order])[0]
+                wavelength_differences.append(fitted_model(input_center) - line['wavelength'])
+            else:
+                continue
+        assert np.std(wavelength_differences) < 1.0

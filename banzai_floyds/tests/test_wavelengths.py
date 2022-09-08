@@ -10,6 +10,7 @@ from banzai_floyds import arc_lines
 from banzai_floyds.frames import FLOYDSObservationFrame, FLOYDSCalibrationFrame
 from banzai.data import CCDData
 from astropy.io import fits
+from banzai_floyds.utils.wavelength_utils import tilt_coordinates, fwhm_to_sigma
 
 
 def build_random_spectrum(seed=None, min_wavelength=3200, line_sigma=3, dispersion=2.5, nlines=10, nx=1001):
@@ -156,19 +157,19 @@ def generate_fake_arc_frame():
     nx = 2048
     ny = 512
     order_height = 93
-    order1 = Legendre((128.7, 71, 43, -9.5), domain=(0, 1600))
+    order1 = Legendre((135.4,  81.8,  45.2, -11.4), domain=(0, 1700))
     order2 = Legendre((410, 17, 63, -12), domain=(475, 1975))
     data = np.zeros((ny, nx))
     errors = np.zeros_like(data)
     orders = Orders([order1, order2], (ny, nx), order_height)
 
     # make a reasonable wavelength model
-    wavelength_model1 = Legendre((8371., 3605., 20., -5., 1.), domain=(0, 1600))
-    wavelength_model2 = Legendre((4455., 1522., 35.), domain=(475, 1975))
-    line_widths = (22., 11.)
-    line_tilts = (9, 9)
-    dispersions = (3.47, 1.71)
-    flux_scale = 8000.0
+    wavelength_model1 = Legendre((7487.2, 2662.3, 20., -5., 1.), domain=(0, 1700))
+    wavelength_model2 = Legendre((4573.5, 1294.6, 15.), domain=(475, 1975))
+    line_widths = [CalibrateWavelengths.INITIAL_LINE_WIDTHS[i] for i in range(1, 3)]
+    line_tilts = [CalibrateWavelengths.INITIAL_LINE_TILTS[i] for i in range(1, 3)]
+    dispersions = [CalibrateWavelengths.INITIAL_DISPERSIONS[i] for i in range(1, 3)]
+    flux_scale = 80000.0
     read_noise = 7.0
 
     # Calculate the tilted coordinates
@@ -180,23 +181,18 @@ def generate_fake_arc_frame():
                 line_widths,
                 dispersions):
         input_order_region = order_region(order_height, order_center, (ny, nx))
-        tilted_x = x2d + (y2d - order_center(x2d)) * np.tan(np.deg2rad(tilt))
+        tilted_x = tilt_coordinates(tilt, x2d[input_order_region],
+                                    y2d[input_order_region] - order_center(x2d[input_order_region]))
 
         # Fill in both used and unused lines that have strengths, setting a reasonable signal to noise
         lines = arc_lines.used_lines + arc_lines.unused_lines
         for line in lines:
             if line['line_strength'] == 'nan':
                 continue
-            roots = (wavelength_model - line['wavelength']).roots()
-            in_order = np.logical_and(np.isreal(roots),
-                                      np.logical_and(roots > 0, roots < max(tilted_x[input_order_region])))
-            if any(in_order):
-                peak_center = np.real_if_close(roots[in_order])
-            else:
-                continue
-            line_sigma = line_width / dispersion / (2.0 * np.sqrt(2.0 * np.log(2.0)))
-            data[input_order_region] += line['line_strength'] * gauss(tilted_x[input_order_region],
-                                                                      peak_center, line_sigma) * flux_scale
+            wavelengths = wavelength_model(tilted_x)
+            line_sigma = fwhm_to_sigma(line_width)
+            data[input_order_region] += line['line_strength'] * gauss(wavelengths,
+                                                                      line['wavelength'], line_sigma) * flux_scale
     # Add poisson noise
     errors += np.sqrt(data)
     data = np.random.poisson(data).astype(float)
@@ -222,7 +218,7 @@ def test_full_wavelength_solution():
     for fit_tilt, input_tilt, in zip(frame.wavelengths.line_tilts, input_wavelength_solution['tilts']):
         np.testing.assert_allclose(fit_tilt, input_tilt, atol=0.1)
 
-    for fitted_model, input_model in zip(frame.wavelengths.polynomials, input_wavelength_solution['models']):
+    for fitted_model, input_model in zip(frame.wavelengths._polynomials, input_wavelength_solution['models']):
         wavelength_differences = []
         for line in arc_lines.used_lines:
             roots = (input_model - line['wavelength']).roots()

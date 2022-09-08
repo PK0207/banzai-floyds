@@ -57,3 +57,46 @@ class WavelengthSolution:
                                          for i in range(int(header[f'POLYORD{order}']) + 1)),
                                domain=eval(header[f'POLYDOM{order}'])))
         return cls(polynomials, line_widths, line_tilts)
+
+
+def tilt_coordinates(tilt_angle, x, y):
+    """
+    Find the x coordinate of a pixel as if it was along the order center to use for the wavelength solution
+
+    Parameters
+    ----------
+    tilt_angle: float angle in degrees counterclockwise to tilt the lines
+    x: x pixel coordinates
+    y: y pixel coordinates
+    center: function to calculate the order center as a function of x (in pixels)
+
+    Returns
+    -------
+    tilted_coordinates: array of the same shape as x and y
+
+    Notes
+    -----
+    This is effectively finding the x intercept, given a slope that is based on the tilt angle, and x0, y0 being a point
+    on the line.
+    \   |
+     \  |
+      \ |
+       \ϴ|
+        |ϴ\
+        | \
+        |  \
+        |   \
+
+    x_tilt = -b / m
+    b = (y0 - m x0)
+    x_tilt = -(y0 - m x0) / m
+    x_tilt = x0 - y0/m
+    m = -cot(ϴ)
+    x_tilt = x0 - y0 * tan(ϴ)
+    """
+
+    return x + y * np.tan(np.deg2rad(tilt_angle))
+
+
+def fwhm_to_sigma(fwhm):
+    return fwhm / (2.0 * np.sqrt(2.0 * np.log(2.0)))

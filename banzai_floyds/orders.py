@@ -380,7 +380,7 @@ class OrderSolver(Stage):
     ORDER_HEIGHT = 93
     CENTER_CUT_WIDTH = 31
     POLYNOMIAL_ORDER = 3
-    ORDER_REGIONS = [(0, 1600), (475, 1975)]
+    ORDER_REGIONS = [(0, 1700), (475, 1975)]
 
     def do_stage(self, image):
         if image.orders is None:

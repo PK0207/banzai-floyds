@@ -269,6 +269,8 @@ class CalibrateWavelengths(Stage):
     # In pixels
     MIN_LINE_SEPARATIONS = {1: 5.0, 2: 5.0}
     FIT_ORDERS = {1: 4, 2: 2}
+    # Success Metrics
+    MATCH_SUCCESS_THRESHOLD = 3 # matched lines required to consider solution success
     """
     Stage that uses Arcs to fit wavelength solution
     """
@@ -302,6 +304,11 @@ class CalibrateWavelengths(Stage):
             corresponding_lines = np.array(correlate_peaks(peaks, linear_solution, self.LINES[self.LINES['used']],
                                                            self.MATCH_THRESHOLDS[order])).astype(float)
             successful_matches = np.isfinite(corresponding_lines)
+            if successful_matches.size < self.MATCH_SUCCESS_THRESHOLD:
+                # TODO: Add Logging?
+                # too few lines for good wavelength solution
+                image.is_bad = True
+                return image
             initial_wavelength_solutions.append(estimate_distortion(peaks[successful_matches],
                                                                     corresponding_lines[successful_matches],
                                                                     image.orders.domains[order],

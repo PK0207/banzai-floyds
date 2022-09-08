@@ -232,7 +232,6 @@ def test_full_wavelength_solution():
 
 
 def test_empty_calibrate_wavelengths_stage():
-    from banzai_floyds.tests.test_utils import plot_array
     input_context = context.Context({})
     nx = 2048
     ny = 512
@@ -249,38 +248,14 @@ def test_empty_calibrate_wavelengths_stage():
     # Add read noise
     errors = np.sqrt(errors * errors + read_noise)
     data += np.random.normal(0.0, read_noise, size=(ny, nx))
-    # save the data, errors, and orders to a floyds frame
+    # save the data, errors, and orders to a floyds Calibration frame
     frame = FLOYDSCalibrationFrame([CCDData(data, fits.Header({}), uncertainty=errors)], 'foo.fits')
     frame.orders = orders
 
     calibrate_wavelengths = CalibrateWavelengths(input_context)
     arc_image = calibrate_wavelengths.do_stage(frame)
-    plot_array(arc_image.wavelengths.data(frame.orders.data))
 
-
-    
-    # # Make datasets
-    # np.random.seed(42)
-    # ny, nx = 516, 503
-    # data = np.zeros((ny, nx))
-    # input_centers = 145, 371
-    # input_center_params = [[input_centers[0], 15, 15], [input_centers[1], 17, 12]]
-    # order_height = 87
-    # read_noise = 5  # everything is gain = 1
-    # # data += np.random.normal(0.0, scale=read_noise, size=data.shape)
-    # input_order_regions = [order_region(order_height, Legendre(params, domain=(0, data.shape[1] - 1)),
-    #                                     data.shape) for params in input_center_params]
-    #
-    # for region in input_order_regions:
-    #     data[region] += np.random.poisson(500.0, size=data.shape)[region]
-    # error = np.sqrt(read_noise ** 2.0 + np.abs(data))
-    #
-    # order_solver = OrderSolver(FakeContext())
-    # order_solver.ORDER_HEIGHT = order_height
-    # order_solver.CENTER_CUT_WIDTH = 21
-    # order_solver.ORDER_REGIONS = [(0, nx), (0, nx)]
-    # image = FLOYDSCalibrationFrame([CCDData(data=data, uncertainty=error, meta=fits.Header({}))], 'foo.fits')
-    # image = order_solver.do_stage(image)
-    # calibrate_wavelengths = CalibrateWavelengths(FakeContext())
-    # arc_image = calibrate_wavelengths.do_stage(image)
-    # plot_array(arc_image.wavelengths.data(image.orders.data))
+    # Make sure image is marked as is_bad.
+    assert arc_image.is_bad
+    # Should not have any wavelengths stored.
+    assert not arc_image.wavelengths

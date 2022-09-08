@@ -60,7 +60,7 @@ class WavelengthSolution:
 
 
 def tilt_coordinates(tilt_angle, x, y):
-    """
+    r"""
     Find the x coordinate of a pixel as if it was along the order center to use for the wavelength solution
 
     Parameters
@@ -78,14 +78,14 @@ def tilt_coordinates(tilt_angle, x, y):
     -----
     This is effectively finding the x intercept, given a slope that is based on the tilt angle, and x0, y0 being a point
     on the line.
-    \   |
-     \  |
-      \ |
+    \    |
+     \   |
+      \  |
        \ϴ|
         |ϴ\
-        | \
         |  \
         |   \
+        |    \
 
     x_tilt = -b / m
     b = (y0 - m x0)

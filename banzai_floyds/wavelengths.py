@@ -270,7 +270,7 @@ class CalibrateWavelengths(Stage):
     MIN_LINE_SEPARATIONS = {1: 5.0, 2: 5.0}
     FIT_ORDERS = {1: 4, 2: 2}
     # Success Metrics
-    MATCH_SUCCESS_THRESHOLD = 3 # matched lines required to consider solution success
+    MATCH_SUCCESS_THRESHOLD = 3  # matched lines required to consider solution success
     """
     Stage that uses Arcs to fit wavelength solution
     """

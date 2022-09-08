@@ -7,7 +7,7 @@ from scipy.signal import find_peaks
 from banzai_floyds.matched_filter import maximize_match_filter
 from banzai_floyds.frames import FLOYDSCalibrationFrame
 from banzai.data import ArrayData
-from banzai_floyds.utils.wavelength_utils import WavelengthSolution
+from banzai_floyds.utils.wavelength_utils import WavelengthSolution, fwhm_to_sigma, tilt_coordinates
 from banzai_floyds.utils.order_utils import get_order_2d_region
 from banzai_floyds.arc_lines import arc_lines_table
 from copy import copy
@@ -109,7 +109,7 @@ def identify_peaks(data, error, line_width, line_sep, domain=None):
 
 def centroiding_weights(theta, x):
     center, line_width = theta
-    sigma = line_width / (2 * np.sqrt(2 * np.log(2)))
+    sigma = fwhm_to_sigma(line_width)
     return gauss(x, center, sigma)
 
 
@@ -131,7 +131,7 @@ def refine_peak_centers(data, error, peaks, line_width, domain=None):
     """
     if domain is None:
         domain = (0, len(data) - 1)
-    line_sigma = line_width / 2.355
+    line_sigma = fwhm_to_sigma(line_width)
     half_fit_window = int(3 * line_sigma)
     centers = []
     for peak in peaks - min(domain):
@@ -200,11 +200,11 @@ def full_wavelength_solution_weights(theta, coordinates, lines):
     """
     tilt, line_width, *polynomial_coefficients = theta
     x, y = coordinates
-    tilted_x = x + np.tan(np.deg2rad(tilt)) * y
+    tilted_x = tilt_coordinates(tilt, x, y)
     wavelength_polynomial = Legendre(polynomial_coefficients, domain=(np.min(x), np.max(x)))
     model_wavelengths = wavelength_polynomial(tilted_x)
     model = np.zeros_like(model_wavelengths)
-    line_sigma = line_width / (2 * np.sqrt(2 * np.log(2)))
+    line_sigma = fwhm_to_sigma(line_width)
     for line in lines:
         # in principle we should set the resolution to be a constant, i.e. delta lambda / lambda, not the overall width
         model += line['strength'] * gauss(model_wavelengths, line['wavelength'], line_sigma)
@@ -258,12 +258,13 @@ class WavelengthSolutionLoader(CalibrationUser):
 class CalibrateWavelengths(Stage):
     EXTRACTION_HEIGHT = 5
     LINES = arc_lines_table()
-    # All in angstroms, measured by Curtis McCully based on initial fits by Joey Chatelain
-    INITIAL_LINE_WIDTHS = {1: 22.0, 2: 11.0}
-    INITIAL_DISPERSIONS = {1: 4.506, 2: 2.03}
+    # All in angstroms, measured by Curtis McCully
+    # FWHM is , 5 pixels
+    INITIAL_LINE_WIDTHS = {1: 15.6, 2: 8.6}
+    INITIAL_DISPERSIONS = {1: 3.13, 2: 1.72}
     # Tilts in degrees measured counterclockwise (right-handed coordinates)
-    INITIAL_LINE_TILTS = {1: 9., 2: 9.}
-    OFFSET_RANGES = {1: np.arange(8200.0, 8500.0, 0.5), 2: np.arange(4300, 4600, 0.5)}
+    INITIAL_LINE_TILTS = {1: 8., 2: 8.}
+    OFFSET_RANGES = {1: np.arange(7300.0, 7700.0, 0.5), 2: np.arange(4300, 4600, 0.5)}
     MATCH_THRESHOLDS = {1: 10.0, 2: 20.0}
     # In pixels
     MIN_LINE_SEPARATIONS = {1: 5.0, 2: 5.0}
@@ -274,42 +275,40 @@ class CalibrateWavelengths(Stage):
     def do_stage(self, image):
         orders = np.unique(image.orders.data)
         orders = orders[orders != 0]
-        if image.wavelengths is None:
-            # if no previous wavelength solution calculate it
-            initial_wavelength_solutions = []
-            for order in orders:
-                # copy order centers and get mask for height of a few extract median along axis=0
-                extraction_orders = copy(image.orders)
-                extraction_orders._order_height = self.EXTRACTION_HEIGHT
-                order_region = get_order_2d_region(extraction_orders.data == order)
-                # Note that his flux has an x origin at the x = 0 instead of the domain of the order
-                # I don't think it matters though
-                flux_1d = np.median(image.data[order_region], axis=0)
-                flux_1d_error = np.sqrt(np.sum((np.sqrt(image.uncertainty[order_region]) /
-                                                float(extraction_orders._order_height)) ** 2, axis=0))
-                linear_solution = linear_wavelength_solution(flux_1d, flux_1d_error, self.LINES,
-                                                             self.INITIAL_DISPERSIONS[order],
-                                                             self.INITIAL_LINE_WIDTHS[order],
-                                                             self.OFFSET_RANGES[order],
-                                                             domain=image.orders.domains[order])
-                # from 1D estimate linear solution
-                # Estimate 1D distortion with higher order polynomials
-                peaks = identify_peaks(flux_1d, flux_1d_error,
-                                       self.INITIAL_LINE_WIDTHS[order] / self.INITIAL_DISPERSIONS[order],
-                                       self.MIN_LINE_SEPARATIONS[order], domain=image.orders.domains[order])
-                peaks = refine_peak_centers(flux_1d, flux_1d_error, peaks,
-                                            self.INITIAL_LINE_WIDTHS[order] / self.INITIAL_DISPERSIONS[order],
-                                            domain=image.orders.domains[order])
-                corresponding_lines = np.array(correlate_peaks(peaks, linear_solution, self.LINES,
-                                                               self.MATCH_THRESHOLDS[order])).astype(float)
-                successful_matches = np.isfinite(corresponding_lines)
-                initial_wavelength_solutions.append(estimate_distortion(peaks[successful_matches],
-                                                                        corresponding_lines[successful_matches],
-                                                                        image.orders.domains[order],
-                                                                        order=self.FIT_ORDERS[order]))
-            image.wavelengths = WavelengthSolution(initial_wavelength_solutions,
-                                                   [self.INITIAL_LINE_WIDTHS[order] for order in orders],
-                                                   [self.INITIAL_LINE_TILTS[order] for order in orders])
+        initial_wavelength_solutions = []
+        for order in orders:
+            # copy order centers and get mask for height of a few extract median along axis=0
+            extraction_orders = copy(image.orders)
+            extraction_orders._order_height = self.EXTRACTION_HEIGHT
+            order_region = get_order_2d_region(extraction_orders.data == order)
+            # Note that his flux has an x origin at the x = 0 instead of the domain of the order
+            # I don't think it matters though
+            flux_1d = np.median(image.data[order_region], axis=0)
+            flux_1d_error = np.sqrt(np.sum((np.sqrt(image.uncertainty[order_region]) /
+                                            float(extraction_orders._order_height)) ** 2, axis=0))
+            linear_solution = linear_wavelength_solution(flux_1d, flux_1d_error, self.LINES[self.LINES['used']],
+                                                         self.INITIAL_DISPERSIONS[order],
+                                                         self.INITIAL_LINE_WIDTHS[order],
+                                                         self.OFFSET_RANGES[order],
+                                                         domain=image.orders.domains[order])
+            # from 1D estimate linear solution
+            # Estimate 1D distortion with higher order polynomials
+            peaks = identify_peaks(flux_1d, flux_1d_error,
+                                   self.INITIAL_LINE_WIDTHS[order] / self.INITIAL_DISPERSIONS[order],
+                                   self.MIN_LINE_SEPARATIONS[order], domain=image.orders.domains[order])
+            peaks = refine_peak_centers(flux_1d, flux_1d_error, peaks,
+                                        self.INITIAL_LINE_WIDTHS[order] / self.INITIAL_DISPERSIONS[order],
+                                        domain=image.orders.domains[order])
+            corresponding_lines = np.array(correlate_peaks(peaks, linear_solution, self.LINES[self.LINES['used']],
+                                                           self.MATCH_THRESHOLDS[order])).astype(float)
+            successful_matches = np.isfinite(corresponding_lines)
+            initial_wavelength_solutions.append(estimate_distortion(peaks[successful_matches],
+                                                                    corresponding_lines[successful_matches],
+                                                                    image.orders.domains[order],
+                                                                    order=self.FIT_ORDERS[order]))
+        image.wavelengths = WavelengthSolution(initial_wavelength_solutions,
+                                               [self.INITIAL_LINE_WIDTHS[order] for order in orders],
+                                               [self.INITIAL_LINE_TILTS[order] for order in orders])
 
         best_fit_polynomials = []
         best_fit_tilts = []
@@ -327,7 +326,7 @@ class CalibrateWavelengths(Stage):
                                                                   x2d[image.orders.data == order],
                                                                   tilt_ys,
                                                                   input_coefficients, input_tilt, input_width,
-                                                                  self.LINES)
+                                                                  self.LINES[self.LINES['used']])
             # evaluate wavelength solution at all pixels in 2D order
             # TODO: Make sure that the domain here doesn't mess up the tilts
             polynomial = Legendre(coefficients, domain=(min(x2d[image.orders.data == order]),

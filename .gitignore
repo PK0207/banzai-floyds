@@ -132,3 +132,6 @@ dmypy.json
 
 # PyCharm
 .idea/
+
+# Directory to store test data
+test_data/

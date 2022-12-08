@@ -10,24 +10,8 @@ from banzai.data import ArrayData
 from banzai_floyds.utils.wavelength_utils import WavelengthSolution, fwhm_to_sigma, tilt_coordinates
 from banzai_floyds.utils.order_utils import get_order_2d_region
 from banzai_floyds.arc_lines import arc_lines_table
+from banzai_floyds.utils.fitting_utils import gauss
 from copy import copy
-
-
-def gauss(x, mu, sigma):
-    """
-    return a normal distribution
-
-    Parameters
-    ----------
-    x: array of x values
-    mu: center/mean/median of normal distribution
-    sigma: standard deviation of normal distribution
-
-    Returns
-    -------
-    array of y values corresponding to x values in given normal distribution
-    """
-    return 1 / np.sqrt(2.0 * np.pi) / sigma * np.exp(-0.5 * (x - mu) * (x - mu) / sigma / sigma)
 
 
 def wavelength_model_weights(theta, x, lines, line_width):
@@ -36,6 +20,7 @@ def wavelength_model_weights(theta, x, lines, line_width):
     weights = np.zeros(x.shape)
     for line in lines:
         if line['used']:
+            # TODO: Make sure this line width is in sigma, not fwhm
             weights += line['strength'] * gauss(wavelengths, line['wavelength'], line_width)
     return weights
 

@@ -56,6 +56,9 @@ class Orders:
         """
         return dict([(i+1, model.domain) for i, model in enumerate(self._models)])
 
+    def center(self, x):
+        return [model(x) for i, model in enumerate(self._models)]
+
 
 def tophat_filter_metric(data, error, region):
     """

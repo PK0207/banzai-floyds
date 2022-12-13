@@ -7,10 +7,10 @@ from scipy.signal import find_peaks
 from banzai_floyds.matched_filter import maximize_match_filter
 from banzai_floyds.frames import FLOYDSCalibrationFrame
 from banzai.data import ArrayData
-from banzai_floyds.utils.wavelength_utils import WavelengthSolution, fwhm_to_sigma, tilt_coordinates
+from banzai_floyds.utils.wavelength_utils import WavelengthSolution, tilt_coordinates
 from banzai_floyds.utils.order_utils import get_order_2d_region
 from banzai_floyds.arc_lines import arc_lines_table
-from banzai_floyds.utils.fitting_utils import gauss
+from banzai_floyds.utils.fitting_utils import gauss, fwhm_to_sigma
 from copy import copy
 
 

@@ -96,7 +96,3 @@ def tilt_coordinates(tilt_angle, x, y):
     """
 
     return x + y * np.tan(np.deg2rad(tilt_angle))
-
-
-def fwhm_to_sigma(fwhm):
-    return fwhm / (2.0 * np.sqrt(2.0 * np.log(2.0)))

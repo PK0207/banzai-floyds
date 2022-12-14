@@ -18,20 +18,23 @@ def background_fixed_profile_center(params, x, center):
 
 
 def fit_profile(data, uncertainty, wavelengths, orders, wavelength_bins, profile_width=4):
-    x2d, y2d = np.meshgrid(np.arange(data.shape[1])), np.arange(data.shape[0])
+    x2d, y2d = np.arange(data.shape[1]), np.arange(data.shape[0])
 
     trace_centers = []
     # for each order
-    for order, order_wavlengths in zip(orders, wavelength_bins):
-        in_order = order.data == order.value
-        y = (y2d - order.center(x2d))[in_order]
+    order_values = np.unique(orders.data)
+    order_values = order_values[order_values != 0]
+    for order_value, order_wavlengths in zip(order_values, wavelength_bins):
+        in_order = orders.data == order_value
+        # y = (y2d - orders.center(x2d))[in_order]
+        y = orders.center(x2d)[order_value]
         trace_points = {'wavelength': [], 'center': []}
         for wavelength_bin in order_wavlengths:
             # We should probably cache this calculation?
-            wavelength_inds = np.logical_and(wavelengths[in_order] <= (wavelength_bin['center'] +
-                                                                       wavelength_bin['width'] / 2.0),
-                                             wavelengths[in_order] >= (wavelength_bin['center'] -
-                                                                       wavelength_bin['width'] / 2.0))
+            wavelength_inds = np.logical_and(wavelengths.data(orders.data)[in_order] <= (wavelength_bin['center'] +
+                                                                                         wavelength_bin['width'] / 2.0),
+                                             wavelengths.data(orders.data)[in_order] >= (wavelength_bin['center'] -
+                                                                                         wavelength_bin['width'] / 2.0))
             data_to_fit = data[in_order][wavelength_inds]
             error_to_fit = uncertainty[in_order][wavelength_inds]
             y_to_fit = y[wavelength_inds]
@@ -157,7 +160,7 @@ def combine_wavelegnth_bins(wavelength_bins):
     # clean up the middle partial overlaps
     middle_bin_upper = wavelength_bins[red_order_index]['center'][overlap_end_index + 1] 
     middle_bin_upper -= wavelength_bins[red_order_index]['width'][overlap_end_index] / 2.0
-    middle_bin_lower = wavelength_bins[blue_order_index]['center'][-1] +\
+    middle_bin_lower = wavelength_bins[blue_order_index]['center'][-1] + \
                        wavelength_bins[blue_order_index]['width'] / 2.0
     middle_bin_center = (middle_bin_upper + middle_bin_lower) / 2.0
     middle_bin_width = middle_bin_upper - middle_bin_lower
@@ -174,14 +177,14 @@ def combine_wavelegnth_bins(wavelength_bins):
 class Extractor(Stage):
     def do_stage(self, image):
         image.wavelength_bins = get_wavelength_bins(image.wavelengths)
-        profile_centers = fit_profile(image.data, image.uncertainty, image.wavelegnths, image.orders,
+        profile_centers = fit_profile(image.data, image.uncertainty, image.wavelengths, image.orders,
                                       image.wavelength_bins)
-        background, profile_widths = fit_background(image.data, image.uncertainty, image.wavelegnths, profile_centers,
+        background, profile_widths = fit_background(image.data, image.uncertainty, image.wavelengths, profile_centers,
                                                     image.orders, image.wavelength_bins)
         image.background = background
         image.profiles = profile_centers, profile_widths
-        image.extracted = extract(image.data, image.uncertainty, image.background, image.weights, image.wavelegnths,
+        image.extracted = extract(image.data, image.uncertainty, image.background, image.weights, image.wavelengths,
                                   image.wavelength_bins)
-        image.spectrum = extract(image.data, image.uncertainty, image.background, image.weights, image.wavelegnths, 
+        image.spectrum = extract(image.data, image.uncertainty, image.background, image.weights, image.wavelengths,
                                  combine_wavelegnth_bins(image.wavelength_bins))
         return image

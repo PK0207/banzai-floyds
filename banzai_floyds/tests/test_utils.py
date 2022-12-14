@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
+import numpy as np
 from astropy.visualization import ZScaleInterval
 from astropy.io import fits
+from banzai_floyds.frames import FLOYDSObservationFrame
 
 
 def plot_array(data, overlays=None):
@@ -21,3 +23,17 @@ def plot_array(data, overlays=None):
 def make_fits(data, header=None, filename="test.fits"):
     hdu = fits.PrimaryHDU(data, header)
     hdu.writeto(filename)
+
+
+def upload_fits(spectra):
+    """Requires unpacked FLOYDS fits file"""
+    try:
+        hdul = fits.open(spectra)
+    except FileNotFoundError:
+        print("Cannot find file {}".format(spectra))
+        return None
+
+    hdul[0].meta = hdul[0].header
+    hdul[0].uncertainty = np.zeros_like(hdul[0].data)
+    frame = FLOYDSObservationFrame(hdul, spectra)
+    return frame

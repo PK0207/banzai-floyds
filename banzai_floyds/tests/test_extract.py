@@ -45,7 +45,7 @@ def generate_fake_science_frame(include_background=False, flat_spectrum=True):
     trace2 = Legendre((-10, -8, -3), domain=(wavelength_model2(475), wavelength_model2(1975)))
     profile_centers = [trace1, trace2]
 
-    wavelengths = WavelengthSolution([wavelength_model1, wavelength_model2], [INITIAL_LINE_WIDTHS[i] for i in range(2)], [INITIAL_LINE_TILTS[i] for i in range(2)])
+    wavelengths = WavelengthSolution([wavelength_model1, wavelength_model2], [INITIAL_LINE_WIDTHS[i + 1] for i in range(2)], [INITIAL_LINE_TILTS[i + 1] for i in range(2)])
 
     x2d, y2d = np.meshgrid(np.arange(nx), np.arange(ny))
     profile_sigma = fwhm_to_sigma(profile_width)
@@ -56,13 +56,13 @@ def generate_fake_science_frame(include_background=False, flat_spectrum=True):
     input_lines = np.random.uniform(3200, 9500, size=10)
     input_line_strengths = np.random.uniform(1000.0, 10000.0, size=10)
     input_line_widths = np.random.uniform(8, 30, size=10)
-    continuum_polynomial = Legendre(1.0, 0.3, -0.2, domain=(3000.0, 12000.0))
+    continuum_polynomial = Legendre((1.0, 0.3, -0.2), domain=(3000.0, 12000.0))
     # normalize out the polynomial so it is close to 1
-    continuum_polynomial /= np.mean(wavelength_polynomial(np.arange(3000.0, 12000.1, 0.1)))
+    continuum_polynomial /= np.mean(continuum_polynomial(np.arange(3000.0, 12000.1, 0.1)))
     for i in range(2):
-        slit_coordinates = y2d - orders.center()[i](x2d)
+        slit_coordinates = y2d - orders.center(x2d)[i]
         in_order = orders.data == i + 1
-        trace_center = profile_centers[i](wavelengths[i][x2d])
+        trace_center = profile_centers[i](wavelengths.data(orders.data))
         if flat_spectrum:
             data[in_order] += flux_normalization * gauss(slit_coordinates[in_order], trace_center[in_order], profile_sigma)
         else:
@@ -78,10 +78,10 @@ def generate_fake_science_frame(include_background=False, flat_spectrum=True):
             for line in SKYLINE_LIST:
                 sky_spectrum += line['line_strength'] * gauss(sky_wavelengths, line['wavelength'], line_widths[i]) * sky_normalization
             # Make a slow illumination gradient to make sure things work even if the sky is not flat
-            illumination = gauss(x2d[in_order] - trace_center(x2d[in_order]), 0.0, 92)
-            input_sky[in_order] = np.interp(x2d[in_order], sky_wavelengths, sky_spectrum) * illumination
+            illumination = 200 * gauss(y2d[in_order] - trace_center[in_order], 0.0, 92)
+            input_sky[in_order] = np.interp(wavelengths.data(orders.data)[in_order], sky_wavelengths, sky_spectrum) * illumination
             data[in_order] += input_sky[in_order] 
-    data = np.random.poisson(data.astype(int))
+    data = np.random.poisson(data.astype(int)).astype(float)
     data += np.random.normal(0.0, read_noise, size=data.shape)
     errors = np.sqrt(read_noise**2 + np.sqrt(np.abs(data)))
 

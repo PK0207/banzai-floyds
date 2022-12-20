@@ -18,22 +18,3 @@ def plot_array(data, overlays=None):
         for overlay in overlays:
             plt.plot(overlay[0], overlay[1], color="green")
     plt.show()
-
-
-def make_fits(data, header=None, filename="test.fits"):
-    hdu = fits.PrimaryHDU(data, header)
-    hdu.writeto(filename)
-
-
-def upload_fits(spectra):
-    """Requires unpacked FLOYDS fits file"""
-    try:
-        hdul = fits.open(spectra)
-    except FileNotFoundError:
-        print("Cannot find file {}".format(spectra))
-        return None
-
-    hdul[0].meta = hdul[0].header
-    hdul[0].uncertainty = np.zeros_like(hdul[0].data)
-    frame = FLOYDSObservationFrame(hdul, spectra)
-    return frame

@@ -18,7 +18,7 @@ def background_fixed_profile_center(params, x, center):
 
 
 def fit_profile(data, uncertainty, wavelengths, orders, wavelength_bins, profile_width=4):
-    x2d, y2d = np.arange(data.shape[1]), np.arange(data.shape[0])
+    x2d, y2d = np.meshgrid(np.arange(data.shape[1]), np.arange(data.shape[0]))
 
     trace_centers = []
     # for each order
@@ -27,7 +27,7 @@ def fit_profile(data, uncertainty, wavelengths, orders, wavelength_bins, profile
     for order_value, order_wavlengths in zip(order_values, wavelength_bins):
         in_order = orders.data == order_value
         # y = (y2d - orders.center(x2d))[in_order]
-        y = orders.center(x2d)[order_value]
+        y = y2d - orders.center(x2d)[order_value]
         trace_points = {'wavelength': [], 'center': []}
         for wavelength_bin in order_wavlengths:
             # We should probably cache this calculation?

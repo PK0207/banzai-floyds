@@ -1,6 +1,6 @@
 from banzai.stages import Stage
 import numpy as np
-from astropy.table import Table
+from astropy.table import Table, vstack
 from banzai_floyds.matched_filter import maximize_match_filter
 from numpy.polynomial.legendre import Legendre
 from banzai_floyds.utils.fitting_utils import gauss, fwhm_to_sigma
@@ -133,7 +133,7 @@ def extract(data, uncertainty, background, weights, wavelengths, wavelength_bins
         # This should be equivalent to Horne 1986 optimal extraction
         flux = np.sum(weights[pixels_to_bin] * data[pixels_to_bin] * uncertainty[pixels_to_bin]**-2)
         flux_normalization = np.sum(weights[pixels_to_bin] * uncertainty[pixels_to_bin] ** -2)
-        results['flux'].append(flux / flux_normalization)
+        results['flux'].append((flux - background) / flux_normalization)
         uncertainty = np.sqrt(np.sum(weights[pixels_to_bin] ** 2 * uncertainty[pixels_to_bin] ** -2))
         results['fluxerror'].append( uncertainty / flux_normalization)
     
@@ -183,8 +183,13 @@ class Extractor(Stage):
                                                     image.orders, image.wavelength_bins)
         image.background = background
         image.profiles = profile_centers, profile_widths
-        image.extracted = extract(image.data, image.uncertainty, image.background, image.weights, image.wavelengths,
-                                  image.wavelength_bins)
+        extracted = []
+        for i in range(len(image.orders.centers)):
+            in_order = image.orders.data == i + 1
+            extracted.append(extract(image.data[in_order], image.uncertainty[in_order], image.background[in_order], image.weights[in_order], image.wavelengths[in_order],
+                                     image.wavelength_bins[i]))
+            extracted[i]['order'] = i + 1
+        image.extracted = vstack(extracted)
         image.spectrum = extract(image.data, image.uncertainty, image.background, image.weights, image.wavelengths,
                                  combine_wavelegnth_bins(image.wavelength_bins))
         return image

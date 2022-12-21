@@ -89,6 +89,7 @@ def generate_fake_science_frame(include_background=False, flat_spectrum=True):
     frame.input_profile_centers = profile_centers
     frame.input_profile_width = profile_width
     frame.wavelengths = wavelengths
+    frame.orders = orders
     if include_background:
         frame.input_sky = input_sky
     if not flat_spectrum:

@@ -1,8 +1,5 @@
 import matplotlib.pyplot as plt
-import numpy as np
 from astropy.visualization import ZScaleInterval
-from astropy.io import fits
-from banzai_floyds.frames import FLOYDSObservationFrame
 
 
 def plot_array(data, overlays=None):

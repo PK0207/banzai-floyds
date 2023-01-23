@@ -59,6 +59,17 @@ class Orders:
     def center(self, x):
         return [model(x) for i, model in enumerate(self._models)]
 
+    @property
+    def shape(self):
+        return self._image_shape
+    
+    @property
+    def order_ids(self):
+        return[i + 1 for i, _ in enumerate(self._models)]
+
+    def center(self, x, order_id):
+        return self._models[order_id - 1](x)
+
 
 def tophat_filter_metric(data, error, region):
     """

@@ -4,21 +4,22 @@ import numpy as np
 
 
 class WavelengthSolution:
-    def __init__(self, polymomials, line_widths, line_tilts):
+    def __init__(self, polymomials, line_widths, line_tilts, orders):
         self._line_widths = line_widths
         self._polynomials = polymomials
         self._line_tilts = line_tilts
+        self._orders = orders
 
-    def data(self, orders):
-        model_wavelengths = np.zeros_like(orders).astype(float)
+    @property
+    def data(self):
+        model_wavelengths = np.zeros(self._orders.shape, dtype=float)
         # Recall that numpy arrays are indexed y,x
-        x2d, y2d = np.meshgrid(np.arange(orders.shape[1]), np.arange(orders.shape[0]))
-
-        order_ids = np.unique(orders)
-        order_ids = order_ids[order_ids != 0]
-        for i, order in enumerate(order_ids):
-            tilted_x = x2d + np.tan(np.deg2rad(self._line_tilts[i])) * y2d
-            model_wavelengths[orders == order] += self._polynomials[i](tilted_x[orders == order])
+        x2d, y2d = np.meshgrid(np.arange(self._orders.shape[1]), np.arange(self._orders.shape[0]))
+        order_ids = self._orders.order_ids
+        order_data = self._orders.data
+        for order, line_tilt, polynomial in zip(order_ids, self._line_tilts, self._polynomials):
+            tilted_x = x2d + np.tan(np.deg2rad(line_tilt)) * (y2d - self._orders.center(x2d, order))
+            model_wavelengths[order_data == order] = polynomial(tilted_x[order_data == order])
         return model_wavelengths
 
     def to_header(self):

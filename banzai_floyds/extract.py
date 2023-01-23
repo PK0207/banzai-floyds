@@ -22,36 +22,32 @@ def fit_profile(data, uncertainty, wavelengths, orders, wavelength_bins, profile
 
     trace_centers = []
     # for each order
-    order_values = np.unique(orders.data)
-    order_values = order_values[order_values != 0]
-    for order_value, order_wavlengths in zip(order_values, wavelength_bins):
-        in_order = orders.data == order_value
-        # y = (y2d - orders.center(x2d))[in_order]
-        y = y2d - orders.center(x2d)[order_value]
-        trace_points = {'wavelength': [], 'center': []}
-        for wavelength_bin in order_wavlengths:
-            # We should probably cache this calculation?
-            wavelength_inds = np.logical_and(wavelengths.data(orders.data)[in_order] <= (wavelength_bin['center'] +
-                                                                                         wavelength_bin['width'] / 2.0),
-                                             wavelengths.data(orders.data)[in_order] >= (wavelength_bin['center'] -
-                                                                                         wavelength_bin['width'] / 2.0))
-            data_to_fit = data[in_order][wavelength_inds]
-            error_to_fit = uncertainty[in_order][wavelength_inds]
-            y_to_fit = y[wavelength_inds]
+    order_ids = orders.order_ids
+    for order_id, order_wavelengths in zip(order_ids, wavelength_bins):
+        in_order = orders.data == order_id
+        y = y2d[in_order] - orders.center(x2d[in_order], order_id)
+        data_table = Table({'data': data[in_order], 'uncertainty': uncertainty[in_order], 'wavelength': wavelengths.data[in_order], 
+                            'x': x2d[in_order], 'y': y})
+        bin_edges = order_wavelengths['center'] - (order_wavelengths['width'] / 2.0)
+        bin_edges = np.append(bin_edges, order_wavelengths['center'][-1] + (order_wavelengths['width'][-1] / 2.0))
 
+        data_table['wavelength_bin'] = np.digitize(data_table['wavelength'], bin_edges)
+        data_table = data_table.group_by('wavelength_bin')
+        trace_points = {'wavelength': [], 'center': []}
+        for wavelength, data_to_fit in zip(order_wavelengths, data_table.groups):
             # Pass a match filter (with correct s/n scaling) with a gaussian with a default width
-            best_fit_center, _ = maximize_match_filter((y_to_fit[np.argmax(data_to_fit)], 0.05), data_to_fit,
-                                                       error_to_fit, profile_gauss_fixed_width, y_to_fit,
-                                                       args=(fwhm_to_sigma(profile_width)))
+            best_fit_center, _ = maximize_match_filter((data_to_fit['y'][np.argmax(data_to_fit['data'])], 0.05), data_to_fit['data'],
+                                                        data_to_fit['uncertainty'], profile_gauss_fixed_width, data_to_fit['y'],
+                                                       args=(fwhm_to_sigma(profile_width),))
             # If the peak pixel of the match filter is > 2 times the median (or something like that) keep the point
-            peak = np.argmin(np.abs(y_to_fit - best_fit_center))
-            if data_to_fit[peak] / error_to_fit[peak] > 2.0 * np.median(np.abs(data_to_fit / error_to_fit)):
-                trace_points['wavelength'].append(wavelength_bin['center'])
-                trace_points['center'].append(peak)
+            peak = np.argmin(np.abs(data_to_fit['y'] - best_fit_center))
+            if data_to_fit['data'][peak] / data_to_fit['uncertainty'][peak] > 2.0 * np.median(np.abs(data_to_fit['data'] / data_to_fit['uncertainty'])):
+                trace_points['wavelength'].append(wavelength['center'])
+                trace_points['center'].append(best_fit_center)
         # fit a polynomial to the points that make the cut to get an estimate of the trace, use the match filter
-        #   metric instead of chi^2
+        # metric instead of chi^2
         # save the polynomial for the profile
-        trace_centers.append(Legendre.fit(trace_points['wavelengths'], trace_points['center'], deg=5)) 
+        trace_centers.append(Legendre.fit(trace_points['wavelength'], trace_points['center'], deg=5)) 
     return trace_centers
 
 

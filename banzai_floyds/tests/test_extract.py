@@ -45,7 +45,7 @@ def generate_fake_science_frame(include_background=False, flat_spectrum=True):
     trace2 = Legendre((-10, -8, -3), domain=(wavelength_model2(475), wavelength_model2(1975)))
     profile_centers = [trace1, trace2]
 
-    wavelengths = WavelengthSolution([wavelength_model1, wavelength_model2], [INITIAL_LINE_WIDTHS[i + 1] for i in range(2)], [INITIAL_LINE_TILTS[i + 1] for i in range(2)])
+    wavelengths = WavelengthSolution([wavelength_model1, wavelength_model2], [INITIAL_LINE_WIDTHS[i + 1] for i in range(2)], [INITIAL_LINE_TILTS[i + 1] for i in range(2)], orders=orders)
 
     x2d, y2d = np.meshgrid(np.arange(nx), np.arange(ny))
     profile_sigma = fwhm_to_sigma(profile_width)
@@ -60,9 +60,9 @@ def generate_fake_science_frame(include_background=False, flat_spectrum=True):
     # normalize out the polynomial so it is close to 1
     continuum_polynomial /= np.mean(continuum_polynomial(np.arange(3000.0, 12000.1, 0.1)))
     for i in range(2):
-        slit_coordinates = y2d - orders.center(x2d)[i]
+        slit_coordinates = y2d - orders.center(x2d, i + 1)
         in_order = orders.data == i + 1
-        trace_center = profile_centers[i](wavelengths.data(orders.data))
+        trace_center = profile_centers[i](wavelengths.data)
         if flat_spectrum:
             data[in_order] += flux_normalization * gauss(slit_coordinates[in_order], trace_center[in_order], profile_sigma)
         else:
@@ -79,7 +79,7 @@ def generate_fake_science_frame(include_background=False, flat_spectrum=True):
                 sky_spectrum += line['line_strength'] * gauss(sky_wavelengths, line['wavelength'], line_widths[i]) * sky_normalization
             # Make a slow illumination gradient to make sure things work even if the sky is not flat
             illumination = 200 * gauss(y2d[in_order] - trace_center[in_order], 0.0, 92)
-            input_sky[in_order] = np.interp(wavelengths.data(orders.data)[in_order], sky_wavelengths, sky_spectrum) * illumination
+            input_sky[in_order] = np.interp(wavelengths.data[in_order], sky_wavelengths, sky_spectrum) * illumination
             data[in_order] += input_sky[in_order] 
     data = np.random.poisson(data.astype(int)).astype(float)
     data += np.random.normal(0.0, read_noise, size=data.shape)
@@ -102,13 +102,15 @@ def generate_fake_science_frame(include_background=False, flat_spectrum=True):
 
 
 def test_tracing():
-    np.random.seed(298347)
+    np.random.seed(3656454)
     # Make a fake frame with a gaussian profile and make sure we recover the input
     fake_frame = generate_fake_science_frame()
     wavelength_bins = get_wavelength_bins(fake_frame.wavelengths)
     fitted_profile_centers = fit_profile(fake_frame.data, fake_frame.uncertainty, fake_frame.wavelengths, fake_frame.orders, wavelength_bins, profile_width=4)
+    domains = [fake_frame.orders.domains[i] for i in range(1, 3)]
     for fitted_center, input_center in zip(fitted_profile_centers, fake_frame.input_profile_centers):
-        np.testing.assert_allclose(fitted_center.coef, input_center.coef, rtol=0.01) 
+        x = np.arange(fitted_center.domain[0], fitted_center.domain[1] + 1)
+        np.testing.assert_allclose(fitted_center(x), input_center(x), rtol=0.00, atol=0.2) 
 
 
 def test_background_fitting():

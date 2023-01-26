@@ -26,8 +26,8 @@ def fit_profile(data, uncertainty, wavelengths, orders, wavelength_bins, profile
     for order_id, order_wavelengths in zip(order_ids, wavelength_bins):
         in_order = orders.data == order_id
         y = y2d[in_order] - orders.center(x2d[in_order], order_id)
-        data_table = Table({'data': data[in_order], 'uncertainty': uncertainty[in_order], 'wavelength': wavelengths.data[in_order], 
-                            'x': x2d[in_order], 'y': y})
+        data_table = Table({'data': data[in_order], 'uncertainty': uncertainty[in_order],
+                            'wavelength': wavelengths.data[in_order], 'x': x2d[in_order], 'y': y})
         bin_edges = order_wavelengths['center'] - (order_wavelengths['width'] / 2.0)
         bin_edges = np.append(bin_edges, order_wavelengths['center'][-1] + (order_wavelengths['width'][-1] / 2.0))
 
@@ -49,7 +49,7 @@ def fit_profile(data, uncertainty, wavelengths, orders, wavelength_bins, profile
         # fit a polynomial to the points that make the cut to get an estimate of the trace, use the match filter
         # metric instead of chi^2
         # save the polynomial for the profile
-        trace_centers.append(Legendre.fit(trace_points['wavelength'], trace_points['center'], deg=5)) 
+        trace_centers.append(Legendre.fit(trace_points['wavelength'], trace_points['center'], deg=5))
     return trace_centers
 
 
@@ -100,7 +100,7 @@ def fit_background(data, uncertainty, wavelengths, profile_fits, orders, wavelen
         # fit a polynomial to the points that make the cut to get an estimate of the trace, use the match filter metric
         #   instead of chi^2
         # save the polynomial for the profile
-        profile_widths.append(Legendre.fit(profile_widths['wavelengths'], profile_widths['width'], deg=5)) 
+        profile_widths.append(Legendre.fit(profile_widths['wavelengths'], profile_widths['width'], deg=5))
     return background_fits, profile_widths
 
 
@@ -121,7 +121,7 @@ def extract(data, uncertainty, background, weights, wavelengths, wavelength_bins
     # We want the average at the center of the pixel (where the wavelength is well-defined).
     # Apparently if you integrate over a plane, the integral and the average are the same,
     #   so we can treat the pixel value as being the average at the center of the pixel to first order.
-    
+
     results = {'flux': [], 'fluxerror': [], 'wavelength': [], 'binwidth': []}
     for i, lower_edge in enumerate(wavelength_bins[:-1]):
         results['wavelength'].append((wavelength_bins[i + 1] + lower_edge) / 2.0)
@@ -133,8 +133,8 @@ def extract(data, uncertainty, background, weights, wavelengths, wavelength_bins
         flux_normalization = np.sum(weights[pixels_to_bin] * uncertainty[pixels_to_bin] ** -2)
         results['flux'].append((flux - background) / flux_normalization)
         uncertainty = np.sqrt(np.sum(weights[pixels_to_bin] ** 2 * uncertainty[pixels_to_bin] ** -2))
-        results['fluxerror'].append( uncertainty / flux_normalization)
-    
+        results['fluxerror'].append(uncertainty / flux_normalization)
+
     return Table(results)
 
 
@@ -156,19 +156,17 @@ def combine_wavelegnth_bins(wavelength_bins):
     overlap_end_index = np.min(np.argwhere(wavelength_bins[red_order_index]['center'] >
                                            np.max(wavelength_regions[blue_order_index]['center'])))
     # clean up the middle partial overlaps
-    middle_bin_upper = wavelength_bins[red_order_index]['center'][overlap_end_index + 1] 
+    middle_bin_upper = wavelength_bins[red_order_index]['center'][overlap_end_index + 1]
     middle_bin_upper -= wavelength_bins[red_order_index]['width'][overlap_end_index] / 2.0
-    middle_bin_lower = wavelength_bins[blue_order_index]['center'][-1] + \
-                       wavelength_bins[blue_order_index]['width'] / 2.0
+    middle_bin_lower = wavelength_bins[blue_order_index]['center'][-1] + wavelength_bins[blue_order_index]['width'] / 2.0
     middle_bin_center = (middle_bin_upper + middle_bin_lower) / 2.0
     middle_bin_width = middle_bin_upper - middle_bin_lower
     overlap_end_index += 1
-    new_bins = {'center': np.hstack([wavelength_bins[blue_order_index]['center'], 
-                                     [middle_bin_center], 
-                                     wavelength_bins[red_order_index][overlap_end_index:]['center']]), 
-                'width': np.hstack([wavelength_bins[blue_order_index]['center'], 
-                                    [middle_bin_width], 
-                                   wavelength_bins[red_order_index][overlap_end_index:]['center']])}
+    new_bins = {'center': np.hstack([wavelength_bins[blue_order_index]['center'], [middle_bin_center],
+                                     wavelength_bins[red_order_index][overlap_end_index:]['center']]),
+                'width': np.hstack([wavelength_bins[blue_order_index]['center'],
+                                    [middle_bin_width],
+                                    wavelength_bins[red_order_index][overlap_end_index:]['center']])}
     return Table(new_bins)
 
 
@@ -184,8 +182,8 @@ class Extractor(Stage):
         extracted = []
         for i in range(len(image.orders.centers)):
             in_order = image.orders.data == i + 1
-            extracted.append(extract(image.data[in_order], image.uncertainty[in_order], image.background[in_order], image.weights[in_order], image.wavelengths[in_order],
-                                     image.wavelength_bins[i]))
+            extracted.append(extract(image.data[in_order], image.uncertainty[in_order], image.background[in_order],
+                                     image.weights[in_order], image.wavelengths[in_order], image.wavelength_bins[i]))
             extracted[i]['order'] = i + 1
         image.extracted = vstack(extracted)
         image.spectrum = extract(image.data, image.uncertainty, image.background, image.weights, image.wavelengths,

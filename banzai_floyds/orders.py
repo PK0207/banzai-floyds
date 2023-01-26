@@ -62,7 +62,7 @@ class Orders:
     @property
     def shape(self):
         return self._image_shape
-    
+
     @property
     def order_ids(self):
         return[i + 1 for i, _ in enumerate(self._models)]

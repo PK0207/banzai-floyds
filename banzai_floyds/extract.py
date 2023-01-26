@@ -36,12 +36,14 @@ def fit_profile(data, uncertainty, wavelengths, orders, wavelength_bins, profile
         trace_points = {'wavelength': [], 'center': []}
         for wavelength, data_to_fit in zip(order_wavelengths, data_table.groups):
             # Pass a match filter (with correct s/n scaling) with a gaussian with a default width
-            best_fit_center, _ = maximize_match_filter((data_to_fit['y'][np.argmax(data_to_fit['data'])], 0.05), data_to_fit['data'],
-                                                        data_to_fit['uncertainty'], profile_gauss_fixed_width, data_to_fit['y'],
+            best_fit_center, _ = maximize_match_filter((data_to_fit['y'][np.argmax(data_to_fit['data'])], 0.05),
+                                                       data_to_fit['data'], data_to_fit['uncertainty'],
+                                                       profile_gauss_fixed_width, data_to_fit['y'],
                                                        args=(fwhm_to_sigma(profile_width),))
             # If the peak pixel of the match filter is > 2 times the median (or something like that) keep the point
             peak = np.argmin(np.abs(data_to_fit['y'] - best_fit_center))
-            if data_to_fit['data'][peak] / data_to_fit['uncertainty'][peak] > 2.0 * np.median(np.abs(data_to_fit['data'] / data_to_fit['uncertainty'])):
+            if data_to_fit['data'][peak] / data_to_fit['uncertainty'][peak] > 2.0 * \
+                    np.median(np.abs(data_to_fit['data'] / data_to_fit['uncertainty'])):
                 trace_points['wavelength'].append(wavelength['center'])
                 trace_points['center'].append(best_fit_center)
         # fit a polynomial to the points that make the cut to get an estimate of the trace, use the match filter

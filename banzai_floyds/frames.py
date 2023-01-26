@@ -55,11 +55,12 @@ class FLOYDSObservationFrame(LCOObservationFrame):
         profile_data = np.zeros(self.orders.shape)
         x2d, y2d = np.meshgrid(np.arange(profile_data.shape[1])), np.arange(profile_data.shape[0])
 
-        for order, order_wavlengths, profile_center, profile_width in zip(self.orders, self.wavelength_bins, profile_centers, profile_widths):
+        for order, order_wavelengths, profile_center, profile_width in zip(self.orders, self.wavelength_bins,
+                                                                           profile_centers, profile_widths):
             # TODO: This needs to refactored into a function that is used in multiple places
             in_order = order.data == order.value
             y = (y2d - order.center(x2d))[in_order]
-            for wavelength_bin in order_wavlengths:
+            for wavelength_bin in order_wavelengths:
                 center = profile_center(wavelength_bin.center)
                 sigma = profile_width(wavelength_bin.center)
                 # We should probably cache this calculation?

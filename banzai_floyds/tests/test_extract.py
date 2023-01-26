@@ -134,6 +134,7 @@ def test_extraction():
         np.testing.assert_allclose(extracted['flux'], 10000.0, rtol=0.05)
         np.testing.assert_allclose(extracted['flux'] / extracted['fluxerror'], 100.0, rtol=0.05)
 
+
 def test_full_extraction_stage():
     np.random.seed(234132)
     input_context = context.Context({})

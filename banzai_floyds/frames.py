@@ -17,6 +17,7 @@ class FLOYDSObservationFrame(LCOObservationFrame):
         self._profile_fits = None
         self._background_fits = None
         self.wavelegnth_bins = None
+        self.binned_data = None
         LCOObservationFrame.__init__(self, hdu_list, file_path, frame_id=frame_id, hdu_order=hdu_order)
 
     def get_1d_and_2d_spectra_products(self, runtime_context):
@@ -65,6 +66,7 @@ class FLOYDSObservationFrame(LCOObservationFrame):
                 # We should probably cache this calculation?
                 wavelength_inds = np.logical_and(self.wavelengths[in_order] <= (wavelength_bin.center + wavelength_bin.width / 2.0), 
                                                  self.wavelengths[in_order] >= (wavelength_bin.center - wavelength_bin.width / 2.0))
+                # TODO: Make sure this is normalzied correctly
                 profile_data[in_order][wavelength_inds] = gauss(y[wavelength_inds], center, sigma)
         self._hdus['PROFILE'] = ArrayData(profile_data, meta=fits.Header({}))
         
@@ -78,11 +80,11 @@ class FLOYDSObservationFrame(LCOObservationFrame):
         background_data = np.zeros(self.data.shape)
         x2d, y2d = np.meshgrid(np.arange(background_data.shape[1])), np.arange(background_data.shape[0])
 
-        for order, order_wavlengths, background_fit in zip(self.orders, self.wavelength_bins, self._background_fits):
+        for order, order_wavelengths, background_fit in zip(self.orders, self.wavelength_bins, self._background_fits):
             # TODO: This needs to refactored into a function that is used in multiple places
             in_order = order.data == order.value
             y = (y2d - order.center(x2d))[in_order]
-            for wavelength_bin, background_model in zip(order_wavlengths, background_fit):
+            for wavelength_bin, background_model in zip(order_wavelengths, background_fit):
                 # We should probably cache this calculation?
                 wavelength_inds = np.logical_and(self.wavelengths[in_order] <= (wavelength_bin.center + wavelength_bin.width / 2.0), 
                                                  self.wavelengths[in_order] >= (wavelength_bin.center - wavelength_bin.width / 2.0))

@@ -3,11 +3,10 @@ from numpy.polynomial.legendre import Legendre
 from banzai import context
 from banzai.data import CCDData
 from astropy.io import fits
-from banzai_floyds.orders import Orders, order_region
-from banzai_floyds.wavelengths import CalibrateWavelengths
+from banzai_floyds.orders import Orders
 from banzai_floyds.utils.wavelength_utils import WavelengthSolution
 from banzai_floyds.frames import FLOYDSObservationFrame
-from banzai_floyds.extract import Extractor, fit_profile, fit_background, extract, get_wavelength_bins
+from banzai_floyds.extract import Extractor, fit_profile, fit_background, extract, get_wavelength_bins, bin_data
 
 from banzai_floyds.utils.fitting_utils import gauss, fwhm_to_sigma
 from banzai.data import CCDData
@@ -76,9 +75,9 @@ def generate_fake_science_frame(include_background=False, flat_spectrum=True):
             sky_spectrum = np.zeros_like(sky_wavelengths)
             sky_spectrum += sky_continuum
             for line in SKYLINE_LIST:
-                sky_spectrum += line['line_strength'] * gauss(sky_wavelengths, line['wavelength'], line_widths[i]) * sky_normalization
+                sky_spectrum += line['line_strength'] * gauss(sky_wavelengths, line['wavelength'], fwhm_to_sigma(line_widths[i])) * sky_normalization
             # Make a slow illumination gradient to make sure things work even if the sky is not flat
-            illumination = 200 * gauss(y2d[in_order] - trace_center[in_order], 0.0, 92)
+            illumination = 100 * gauss(slit_coordinates[in_order], 0.0, 48)
             input_sky[in_order] = np.interp(wavelengths.data[in_order], sky_wavelengths, sky_spectrum) * illumination
             data[in_order] += input_sky[in_order] 
     data = np.random.poisson(data.astype(int)).astype(float)
@@ -106,8 +105,8 @@ def test_tracing():
     # Make a fake frame with a gaussian profile and make sure we recover the input
     fake_frame = generate_fake_science_frame()
     wavelength_bins = get_wavelength_bins(fake_frame.wavelengths)
-    fitted_profile_centers = fit_profile(fake_frame.data, fake_frame.uncertainty, fake_frame.wavelengths, fake_frame.orders, wavelength_bins, profile_width=4)
-    domains = [fake_frame.orders.domains[i] for i in range(1, 3)]
+    binned_data = bin_data(fake_frame.data, fake_frame.uncertainty, fake_frame.wavelengths, fake_frame.orders, wavelength_bins)
+    fitted_profile_centers = fit_profile(binned_data, profile_width=4)
     for fitted_center, input_center in zip(fitted_profile_centers, fake_frame.input_profile_centers):
         x = np.arange(fitted_center.domain[0], fitted_center.domain[1] + 1)
         np.testing.assert_allclose(fitted_center(x), input_center(x), rtol=0.00, atol=0.2) 
@@ -117,8 +116,8 @@ def test_background_fitting():
     np.random.seed(9813245)
     fake_frame = generate_fake_science_frame(include_background=True)
     wavelength_bins = get_wavelength_bins(fake_frame.wavelengths)
-    fitted_background, _ = fit_background(fake_frame.data, fake_frame.uncertainty, fake_frame.wavelengths, fake_frame.input_profile_centers, 
-                                          fake_frame.orders, wavelength_bins)
+    binned_data = bin_data(fake_frame.data, fake_frame.uncertainty, fake_frame.wavelengths, fake_frame.orders, wavelength_bins)
+    fitted_background, _ = fit_background(binned_data, fake_frame.input_profile_centers)
     fake_frame.background = fitted_background
     np.testing.assert_allclose(fake_frame.background[fake_frame.orders.data > 0], fake_frame.input_sky[fake_frame.orders.data > 0], rtol=0.03)
 

@@ -33,9 +33,9 @@ def bin_data(data, uncertainty, wavelengths, orders, wavelength_bins):
         in_order = np.logical_and(in_order, wavelengths.data > min_wavelength)
         in_order = np.logical_and(in_order, wavelengths.data < max_wavelength)
 
-        y = y2d[in_order] - orders.center(x2d[in_order], order_id)
+        y_order = y2d[in_order] - orders.center(x2d[in_order], order_id)
         data_table = Table({'data': data[in_order], 'uncertainty': uncertainty[in_order], 'wavelength': wavelengths.data[in_order], 
-                            'x': x2d[in_order], 'y': y})
+                            'x': x2d[in_order], 'y': y2d[in_order], 'y_order': y_order})
         bin_number = np.digitize(data_table['wavelength'], bins_to_bin_edges(order_wavelengths))
         data_table['wavelength_bin'] = wavelength_bins[order_id - 1]['center'][bin_number - 1]
         data_table['order'] = order_id
@@ -52,11 +52,11 @@ def fit_profile(data, profile_width=4):
     trace_points = Table({'wavelength': [], 'center': [], 'order': []})
     for data_to_fit in data.groups:
         # Pass a match filter (with correct s/n scaling) with a gaussian with a default width
-        best_fit_center, _ = maximize_match_filter((data_to_fit['y'][np.argmax(data_to_fit['data'])], 0.05), data_to_fit['data'],
-                                                    data_to_fit['uncertainty'], profile_gauss_fixed_width, data_to_fit['y'],
+        best_fit_center, _ = maximize_match_filter((data_to_fit['y_order'][np.argmax(data_to_fit['data'])], 0.05), data_to_fit['data'],
+                                                    data_to_fit['uncertainty'], profile_gauss_fixed_width, data_to_fit['y_order'],
                                                     args=(fwhm_to_sigma(profile_width),))
         # If the peak pixel of the match filter is > 2 times the median (or something like that) keep the point
-        peak = np.argmin(np.abs(data_to_fit['y'] - best_fit_center))
+        peak = np.argmin(np.abs(data_to_fit['y_order'] - best_fit_center))
         if data_to_fit['data'][peak] / data_to_fit['uncertainty'][peak] > 2.0 * np.median(np.abs(data_to_fit['data'] / data_to_fit['uncertainty'])):
             trace_points = vstack([trace_points, Table({'wavelength': [data_to_fit['wavelength_bin'][0]], 'center': [best_fit_center], 'order': [data_to_fit['order'][0]]})])
 
@@ -70,34 +70,37 @@ def fit_background(data, profile_fits, poly_order=4, default_width=4):
     # In principle, this should be some big 2d fit where we fit the profile center, the profile width,
     #   and the background in one go
     profile_width = {'wavelength': [], 'width': [], 'order': []}
-    background_fit = {'wavelength': [], 'coeffs': [], 'order': []}
+    background_fit = Table({'x': [], 'y': [], 'background': []})
     for data_to_fit in data.groups:
         profile = profile_fits[data_to_fit['order'][0] - 1]
         wavelength_bin = data_to_fit['wavelength_bin'][0]
         order_id = data_to_fit['order'][0]
 
         # Pass a match filter (with correct s/n scaling) with a gaussian with a default width
-        initial_guess = fwhm_to_sigma(default_width), *np.zeros(poly_order + 1)
+        initial_coeffs = np.zeros(poly_order + 1)
+        initial_coeffs[0] = np.median(data_to_fit['data']) / np.max(data_to_fit['data'])
+        # Normalize to the peak of the gaussian
+        initial_coeffs[0] /= np.sqrt(2.0 * np.pi) * fwhm_to_sigma(default_width)
+        initial_guess = fwhm_to_sigma(default_width),*initial_coeffs
         best_fit_sigma, *best_fit_coeffs = maximize_match_filter(initial_guess, data_to_fit['data'], data_to_fit['uncertainty'],
-                                                                 background_fixed_profile_center, data_to_fit['y'],
+                                                                 background_fixed_profile_center, data_to_fit['y_order'],
                                                                  args=(profile(wavelength_bin),))
         # If the peak of the profile is 2 > than the peak of the background, keep the profile width
-        peak = np.argmin(np.abs(data_to_fit['y'] - best_fit_sigma))
-        if data_to_fit['data'][peak] / data_to_fit['uncertainty'][peak] > 2.0 * np.median(np.abs(data_to_fit['data'] / data_to_fit['uncertainty'])):
+        peak = np.argmin(np.abs(data_to_fit['y']))
+        if (data_to_fit['data'][peak] / data_to_fit['uncertainty'][peak] > 2.0) * np.median(np.abs(data_to_fit['data'] / data_to_fit['uncertainty'])):
             profile_width['wavelength'].append(wavelength_bin)
             profile_width['width'].append(best_fit_sigma)
             profile_width['order'].append(order_id)
-        background_fit['wavelength'].append(wavelength_bin)
         # The match filter is insensitive to the normalization, so we do a simply chi^2 fit for the normalization
         # minimize sum(d - norm * poly)^2 / sig^2)
         # norm = sum(d / sig^2) / sum(poly / sig^2)
         normalization = np.sum(data_to_fit['data'] / (data_to_fit['uncertainty'] ** 2.0))
-        normalization /= np.sum(background_fixed_profile_center((best_fit_sigma, *best_fit_coeffs), data_to_fit['y'], profile(wavelength_bin)) * data_to_fit['uncertainty'] ** -2.0)
-        background_fit['coeffs'].append(np.array(best_fit_coeffs) * normalization)
-        background_fit['order'].append(order_id)
+        normalization /= np.sum(background_fixed_profile_center((best_fit_sigma, *best_fit_coeffs), data_to_fit['y_order'], profile(wavelength_bin)) * data_to_fit['uncertainty'] ** -2.0)
+        background_polynomial = Legendre(coef=np.array(best_fit_coeffs) * normalization, domain=(np.min(data_to_fit['y_order']), np.max(data_to_fit['y_order'])))
+        background_fit = vstack([background_fit, Table({'x': data_to_fit['x'], 'y': data_to_fit['y'], 'background': background_polynomial(data_to_fit['y_order'])})])
 
     profile_widths = [Legendre.fit(order_data['wavelength'], order_data['width'], deg=5) for order_data in Table(profile_width).group_by('order').groups]
-    return Table(background_fit), profile_widths
+    return background_fit, profile_widths
 
 
 

@@ -47,7 +47,7 @@ class FLOYDSObservationFrame(LCOObservationFrame):
 
     @property
     def profile(self):
-        return self._hdus['PROFILE'].data
+        return self['PROFILE'].data
 
     @profile.setter
     def profile(self, value):
@@ -65,41 +65,21 @@ class FLOYDSObservationFrame(LCOObservationFrame):
                 center = profile_center(wavelength_bin.center)
                 sigma = profile_width(wavelength_bin.center)
                 # We should probably cache this calculation?
-<<<<<<< HEAD
                 wavelength_inds = np.logical_and(self.wavelengths[in_order] <= (wavelength_bin.center + wavelength_bin.width / 2.0), 
                                                  self.wavelengths[in_order] >= (wavelength_bin.center - wavelength_bin.width / 2.0))
                 # TODO: Make sure this is normalzied correctly
-=======
-                wavelength_inds = np.logical_and(self.wavelengths[in_order] <=
-                                                 (wavelength_bin.center + wavelength_bin.width / 2.0),
-                                                 self.wavelengths[in_order] >=
-                                                 (wavelength_bin.center - wavelength_bin.width / 2.0))
->>>>>>> 178a9c05a739b920a173ef928332dc6c8ff73736
                 profile_data[in_order][wavelength_inds] = gauss(y[wavelength_inds], center, sigma)
-        self._hdus['PROFILE'] = ArrayData(profile_data, meta=fits.Header({}))
+        self.add_or_update(ArrayData(profile_data, name='PROFILE', meta=fits.Header({})))
 
     @property
     def background(self):
-        return self._hdus['BACKGROUND'].data()
+        return self['BACKGROUND'].data
 
-    @profile.setter
+    @background.setter
     def background(self, value):
-        self._background_fits = value
         background_data = np.zeros(self.data.shape)
-        x2d, y2d = np.meshgrid(np.arange(background_data.shape[1])), np.arange(background_data.shape[0])
-
-        for order, order_wavelengths, background_fit in zip(self.orders, self.wavelength_bins, self._background_fits):
-            # TODO: This needs to refactored into a function that is used in multiple places
-            in_order = order.data == order.value
-            y = (y2d - order.center(x2d))[in_order]
-            for wavelength_bin, background_model in zip(order_wavelengths, background_fit):
-                # We should probably cache this calculation?
-                wavelength_inds = np.logical_and(self.wavelengths[in_order] <=
-                                                 (wavelength_bin.center + wavelength_bin.width / 2.0),
-                                                 self.wavelengths[in_order] >=
-                                                 (wavelength_bin.center - wavelength_bin.width / 2.0))
-                background_data[in_order][wavelength_inds] = background_model(y[wavelength_inds])
-        self._hdus['BACKGROUND'] = ArrayData(background_data, meta=fits.Header({}))
+        background_data[value['y'].astype(int), value['x'].astype(int)] = value['background']
+        self.add_or_update(ArrayData(background_data, name='BACKGROUND', meta=fits.Header({})))
 
 
 class FLOYDSCalibrationFrame(LCOCalibrationFrame, FLOYDSObservationFrame):

@@ -18,3 +18,7 @@ def gauss(x, mu, sigma):
 
 def fwhm_to_sigma(fwhm):
     return fwhm / (2.0 * np.sqrt(2.0 * np.log(2.0)))
+
+
+def sigma_to_fwhm(sigma):
+    return sigma * (2.0 * np.sqrt(2.0 * np.log(2.0)))

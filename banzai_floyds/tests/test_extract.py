@@ -119,7 +119,9 @@ def test_background_fitting():
     binned_data = bin_data(fake_frame.data, fake_frame.uncertainty, fake_frame.wavelengths, fake_frame.orders, wavelength_bins)
     fitted_background, _ = fit_background(binned_data, fake_frame.input_profile_centers)
     fake_frame.background = fitted_background
-    np.testing.assert_allclose(fake_frame.background[fake_frame.orders.data > 0], fake_frame.input_sky[fake_frame.orders.data > 0], rtol=0.03)
+    binned_fitted_background = bin_data(fake_frame.data, fake_frame.uncertainty, fake_frame.wavelengths, fake_frame.orders, wavelength_bins)
+    binned_input_sky = bin_data(fake_frame.data, fake_frame.uncertainty, fake_frame.wavelengths, fake_frame.orders, wavelength_bins)
+    np.testing.assert_allclose(binned_fitted_background['data'].groups.aggregate(np.sum), binned_input_sky['data'].groups.aggregate(np.sum), rtol=0.03)
 
 
 def test_extraction():

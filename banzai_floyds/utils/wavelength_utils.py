@@ -59,6 +59,10 @@ class WavelengthSolution:
                                domain=eval(header[f'POLYDOM{order}'])))
         return cls(polynomials, line_widths, line_tilts)
 
+    @property
+    def orders(self):
+        return self._orders
+
 
 def tilt_coordinates(tilt_angle, x, y):
     r"""

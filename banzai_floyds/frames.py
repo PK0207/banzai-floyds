@@ -1,7 +1,7 @@
 from banzai.lco import LCOObservationFrame, LCOFrameFactory, LCOCalibrationFrame
 from typing import Optional
 from banzai.frames import ObservationFrame
-from banzai.data import DataProduct, HeaderOnly, ArrayData
+from banzai.data import DataProduct, HeaderOnly, ArrayData, DataTable
 from banzai_floyds.orders import Orders
 from banzai_floyds.utils.wavelength_utils import WavelengthSolution
 import numpy as np
@@ -18,6 +18,7 @@ class FLOYDSObservationFrame(LCOObservationFrame):
         self._background_fits = None
         self.wavelegnth_bins = None
         self.binned_data = None
+        self._extracted = None
         LCOObservationFrame.__init__(self, hdu_list, file_path, frame_id=frame_id, hdu_order=hdu_order)
 
     def get_1d_and_2d_spectra_products(self, runtime_context):
@@ -53,23 +54,17 @@ class FLOYDSObservationFrame(LCOObservationFrame):
     def profile(self, value):
         self._profile_fits = value
         profile_centers, profile_widths = value
-        profile_data = np.zeros(self.orders.shape)
-        x2d, y2d = np.meshgrid(np.arange(profile_data.shape[1])), np.arange(profile_data.shape[0])
+        profile_data = np.zeros(self.orders.data.shape)
+        x2d, y2d = np.meshgrid(np.arange(profile_data.shape[1]), np.arange(profile_data.shape[0]))
+        for order_id, profile_center, profile_width in zip(self.orders.order_ids, profile_centers, profile_widths):
+            in_order = self.orders.data == order_id
+            wavelengths = self.wavelengths.data[in_order]
+            # TODO: Make sure this is normalized correctly, note that the widths in the value set here are sigma and not fwhm
+            profile_data[in_order] = gauss(y2d[in_order] - self.orders.center(x2d[in_order], order_id), profile_center(wavelengths), profile_width(wavelengths))
 
-        for order, order_wavelengths, profile_center, profile_width in zip(self.orders, self.wavelength_bins,
-                                                                           profile_centers, profile_widths):
-            # TODO: This needs to refactored into a function that is used in multiple places
-            in_order = order.data == order.value
-            y = (y2d - order.center(x2d))[in_order]
-            for wavelength_bin in order_wavelengths:
-                center = profile_center(wavelength_bin.center)
-                sigma = profile_width(wavelength_bin.center)
-                # We should probably cache this calculation?
-                wavelength_inds = np.logical_and(self.wavelengths[in_order] <= (wavelength_bin.center + wavelength_bin.width / 2.0), 
-                                                 self.wavelengths[in_order] >= (wavelength_bin.center - wavelength_bin.width / 2.0))
-                # TODO: Make sure this is normalzied correctly
-                profile_data[in_order][wavelength_inds] = gauss(y[wavelength_inds], center, sigma)
         self.add_or_update(ArrayData(profile_data, name='PROFILE', meta=fits.Header({})))
+        if self.binned_data is not None:
+            self.binned_data['weights'] = profile_data[self.binned_data['y'].astype(int), self.binned_data['x'].astype(int)]
 
     @property
     def background(self):
@@ -80,6 +75,17 @@ class FLOYDSObservationFrame(LCOObservationFrame):
         background_data = np.zeros(self.data.shape)
         background_data[value['y'].astype(int), value['x'].astype(int)] = value['background']
         self.add_or_update(ArrayData(background_data, name='BACKGROUND', meta=fits.Header({})))
+        if self.binned_data is not None:
+            self.binned_data['background'] = background_data[self.binned_data['y'].astype(int), self.binned_data['x'].astype(int)]
+
+    @property
+    def extracted(self):
+        return self._extracted
+
+    @extracted.setter
+    def extracted(self, value):
+        self._extracted = value
+        self.add_or_update(DataTable(value, name='EXTRACTED', meta=fits.Header({})))
 
 
 class FLOYDSCalibrationFrame(LCOCalibrationFrame, FLOYDSObservationFrame):

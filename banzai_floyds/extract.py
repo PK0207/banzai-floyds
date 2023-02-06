@@ -38,6 +38,7 @@ def bin_data(data, uncertainty, wavelengths, orders, wavelength_bins):
                             'x': x2d[in_order], 'y': y2d[in_order], 'y_order': y_order})
         bin_number = np.digitize(data_table['wavelength'], bins_to_bin_edges(order_wavelengths))
         data_table['wavelength_bin'] = wavelength_bins[order_id - 1]['center'][bin_number - 1]
+        data_table['wavelength_bin_width'] = wavelength_bins[order_id - 1]['width'][bin_number - 1]
         data_table['order'] = order_id
         if binned_data is None:
             binned_data = data_table
@@ -110,31 +111,34 @@ def get_wavelength_bins(wavelengths):
     """
     # TODO: in the long run we probably shouldn't bin at all and just do a full 2d sky fit
     #   (including all flux in the order, yikes)
-    all_bin_edges = [model(np.arange(min(model.domain) - 0.5,
-                                     max(model.domain) + 1)) for model in wavelengths._polynomials]
+    # Throw out the edge bins of the order as the lines are tilt and our orders are vertical
+    pixels_to_cut = np.round(0.5 * np.sin(np.deg2rad(wavelengths.line_tilts)) * wavelengths.orders.order_height)
+    all_bin_edges = [model(np.arange(min(model.domain) - 0.5 + cut,
+                                     max(model.domain) + 1 - cut)) for model, cut in zip(wavelengths._polynomials, pixels_to_cut)]
     return [Table({'center': (bin_edges[1:] + bin_edges[:-1]) / 2.0,
                    'width': bin_edges[1:] - bin_edges[:-1]}) for bin_edges in all_bin_edges]
 
 
-def extract(data, uncertainty, background, weights, wavelengths, wavelength_bins):
+def extract(binned_data):
     # Each pixel is the integral of the flux over the full area of the pixel.
     # We want the average at the center of the pixel (where the wavelength is well-defined).
     # Apparently if you integrate over a pixel, the integral and the average are the same,
     #   so we can treat the pixel value as being the average at the center of the pixel to first order.
 
-    results = {'flux': [], 'fluxerror': [], 'wavelength': [], 'binwidth': []}
-    for i, lower_edge in enumerate(wavelength_bins[:-1]):
-        results['wavelength'].append((wavelength_bins[i + 1] + lower_edge) / 2.0)
-        results['binwidth'].append(wavelength_bins[i + 1] - lower_edge)
-
-        pixels_to_bin = np.logical_and(wavelengths >= lower_edge, wavelengths < wavelength_bins[i + 1])
+    results = {'flux': [], 'fluxerror': [], 'wavelength': [], 'binwidth': [], 'order': []}
+    for data_to_sum in binned_data.groups:
+        wavelength_bin = data_to_sum['wavelength_bin'][0]
+        wavelength_bin_width = data_to_sum['wavelength_bin_width'][0]
+        order_id = data_to_sum['order'][0]
         # This should be equivalent to Horne 1986 optimal extraction
-        flux = np.sum(weights[pixels_to_bin] * (data[pixels_to_bin] - background[pixels_to_bin]) * uncertainty[pixels_to_bin]**-2)
-        flux_normalization = np.sum(weights[pixels_to_bin]**2 * uncertainty[pixels_to_bin] ** -2)
+        flux = np.sum(data_to_sum['weights'] * (data_to_sum['data'] - data_to_sum['background']) * data_to_sum['uncertainty']**-2)
+        flux_normalization = np.sum(data_to_sum['weights']**2 * data_to_sum['uncertainty'] ** -2)
         results['flux'].append(flux / flux_normalization)
-        uncertainty = np.sqrt(np.sum(weights[pixels_to_bin]))
-        results['fluxerror'].append(uncertainty / flux_normalization)
-    
+        uncertainty = np.sqrt(np.sum(data_to_sum['weights']) / flux_normalization)
+        results['fluxerror'].append(uncertainty )
+        results['wavelength'].append(wavelength_bin)
+        results['binwidth'].append(wavelength_bin_width)
+        results['order'].append(order_id)
     return Table(results)
 
 
@@ -177,14 +181,9 @@ class Extractor(Stage):
         profile_centers = fit_profile(image.binned_data)
         background, profile_widths = fit_background(image.binned_data, profile_centers)
         image.background = background
-        image.profiles = profile_centers, profile_widths
-        extracted = []
-        for i in range(len(image.orders.centers)):
-            in_order = image.orders.data == i + 1
-            extracted.append(extract(image.data[in_order], image.uncertainty[in_order], image.background[in_order],
-                                     image.weights[in_order], image.wavelengths[in_order], image.wavelength_bins[i]))
-            extracted[i]['order'] = i + 1
-        image.extracted = vstack(extracted)
+        image.profile = profile_centers, profile_widths
+        image.extracted = extract(image.binned_data)
+
         # TODO: Stitching together the orders is going to require flux calibration and probably 
         # a scaling due to aperture corrections
 

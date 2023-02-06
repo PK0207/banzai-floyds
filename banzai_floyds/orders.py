@@ -70,6 +70,10 @@ class Orders:
     def center(self, x, order_id):
         return self._models[order_id - 1](x)
 
+    @property
+    def order_height(self):
+        return self._order_height
+
 
 def tophat_filter_metric(data, error, region):
     """

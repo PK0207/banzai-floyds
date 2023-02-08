@@ -49,7 +49,7 @@ pipeline {
 	            script {
                     withKubeConfig([credentialsId: "build-kube-config"]) {
                         sh('helm repo update')
-                        final cmd = " helm delete --purge banzai-floyds-e2e &> cleanup.txt"
+                        final cmd = " helm --namespace build delete banzai-floyds-e2e &> cleanup.txt"
                         final status = sh(script: cmd, returnStatus: true)
                         final output = readFile('cleanup.txt').trim()
                         sh(script: "rm -f cleanup.txt", returnStatus: true)

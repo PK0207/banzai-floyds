@@ -35,6 +35,9 @@ pipeline {
 			}
 		}
 		stage('DeployTestStack') {
+			agent {
+				label 'helm'
+			}
 			when {
 				anyOf {
 					branch 'PR-*'
@@ -51,7 +54,7 @@ pipeline {
                         final output = readFile('cleanup.txt').trim()
                         sh(script: "rm -f cleanup.txt", returnStatus: true)
                         echo output
-                        sh('helm upgrade --install banzai-floyds-e2e helm-chart/banzai-floyds-e2e ' +
+                        sh('helm --namespace build upgrade --install banzai-floyds-e2e helm-chart/banzai-floyds-e2e ' +
                             '--set image.tag="${GIT_DESCRIPTION}" --force --wait --timeout=3600')
 
                         podName = sh(script: 'kubectl get po -l app.kubernetes.io/instance=banzai-floyds-e2e ' +
@@ -97,6 +100,9 @@ pipeline {
 			}
 		}
 		stage('Test-Science-Frame-Creation') {
+			agent {
+				label 'helm'
+			}
 			environment {
 				// store stage start time in the environment so it has stage scope
 				START_TIME = sh(script: 'date +%s', returnStdout: true).trim()
@@ -131,7 +137,7 @@ pipeline {
 				success {
 					script {
 					    withKubeConfig([credentialsId: "build-kube-config"]) {
-                            sh("helm delete banzai-floyds-e2e --purge || true")
+                            sh("helm --namespace build delete banzai-floyds-e2e || true")
 					    }
 					}
 				}

@@ -28,7 +28,7 @@ def generate_fake_science_frame(include_background=False, flat_spectrum=True):
     profile_width = 4
     order_height = 93
     read_noise = 6.5
-    line_widths = [15.6, 8.6] 
+    line_widths = [15.6, 8.6]
 
     sky_continuum = 800.0
 
@@ -116,7 +116,7 @@ def test_tracing():
     fitted_profile_centers = fit_profile(binned_data, profile_width=4)
     for fitted_center, input_center in zip(fitted_profile_centers, fake_frame.input_profile_centers):
         x = np.arange(fitted_center.domain[0], fitted_center.domain[1] + 1)
-        np.testing.assert_allclose(fitted_center(x), input_center(x), rtol=0.00, atol=0.2) 
+        np.testing.assert_allclose(fitted_center(x), input_center(x), rtol=0.00, atol=0.2)
 
 
 def test_background_fitting():

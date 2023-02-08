@@ -56,15 +56,19 @@ class FLOYDSObservationFrame(LCOObservationFrame):
         profile_centers, profile_widths = value
         profile_data = np.zeros(self.orders.data.shape)
         x2d, y2d = np.meshgrid(np.arange(profile_data.shape[1]), np.arange(profile_data.shape[0]))
-        for order_id, profile_center, profile_width in zip(self.orders.order_ids, profile_centers, profile_widths):
+        order_iter = zip(self.orders.order_ids, profile_centers, profile_widths, self.orders.center(x2d))
+        for order_id, profile_center, profile_width, order_center in order_iter:
             in_order = self.orders.data == order_id
             wavelengths = self.wavelengths.data[in_order]
-            # TODO: Make sure this is normalized correctly, note that the widths in the value set here are sigma and not fwhm
-            profile_data[in_order] = gauss(y2d[in_order] - self.orders.center(x2d[in_order], order_id), profile_center(wavelengths), profile_width(wavelengths))
+            # TODO: Make sure this is normalized correctly
+            # Note that the widths in the value set here are sigma and not fwhm
+            profile_data[in_order] = gauss(y2d[in_order] - order_center[in_order],
+                                           profile_center(wavelengths), profile_width(wavelengths))
 
         self.add_or_update(ArrayData(profile_data, name='PROFILE', meta=fits.Header({})))
         if self.binned_data is not None:
-            self.binned_data['weights'] = profile_data[self.binned_data['y'].astype(int), self.binned_data['x'].astype(int)]
+            x, y = self.binned_data['x'].astype(int), self.binned_data['y'].astype(int)
+            self.binned_data['weights'] = profile_data[y, x]
 
     @property
     def background(self):
@@ -76,7 +80,8 @@ class FLOYDSObservationFrame(LCOObservationFrame):
         background_data[value['y'].astype(int), value['x'].astype(int)] = value['background']
         self.add_or_update(ArrayData(background_data, name='BACKGROUND', meta=fits.Header({})))
         if self.binned_data is not None:
-            self.binned_data['background'] = background_data[self.binned_data['y'].astype(int), self.binned_data['x'].astype(int)]
+            x, y = self.binned_data['x'].astype(int), self.binned_data['y'].astype(int)
+            self.binned_data['background'] = background_data[y, x]
 
     @property
     def extracted(self):

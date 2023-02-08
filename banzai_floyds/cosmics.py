@@ -2,7 +2,7 @@ from banzai.stages import Stage
 from astroscrappy import detect_cosmics
 
 
-def CosmicRayMasker(Stage):
+class CosmicRayMasker(Stage):
     def do_stage(image):
         for order in image.orders:
             in_order = order.data == order.value

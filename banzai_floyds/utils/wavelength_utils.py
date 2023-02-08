@@ -17,8 +17,9 @@ class WavelengthSolution:
         x2d, y2d = np.meshgrid(np.arange(self._orders.shape[1]), np.arange(self._orders.shape[0]))
         order_ids = self._orders.order_ids
         order_data = self._orders.data
-        for order, line_tilt, polynomial in zip(order_ids, self._line_tilts, self._polynomials):
-            tilted_x = x2d + np.tan(np.deg2rad(line_tilt)) * (y2d - self._orders.center(x2d, order))
+        order_iter = zip(order_ids, self._orders.center(x2d), self._line_tilts, self._polynomials)
+        for order, order_center, line_tilt, polynomial in order_iter:
+            tilted_x = x2d + np.tan(np.deg2rad(line_tilt)) * (y2d - order_center)
             model_wavelengths[order_data == order] = polynomial(tilted_x[order_data == order])
         return model_wavelengths
 
@@ -62,6 +63,10 @@ class WavelengthSolution:
     @property
     def orders(self):
         return self._orders
+
+    @property
+    def bin_edges(self):
+        return [model(np.arange(min(model.domain)-0.5, max(model.domain)+1)) for model in self._polynomials]
 
 
 def tilt_coordinates(tilt_angle, x, y):

@@ -328,7 +328,7 @@ class CalibrateWavelengths(Stage):
             best_fit_tilts.append(tilt)
             best_fit_widths.append(width)
 
-        image.wavelengths = WavelengthSolution(best_fit_polynomials, best_fit_widths, best_fit_tilts, orders)
+        image.wavelengths = WavelengthSolution(best_fit_polynomials, best_fit_widths, best_fit_tilts, image.orders)
         image.add_or_update(ArrayData(image.wavelengths.data, name='WAVELENGTHS',
                                       meta=image.wavelengths.to_header()))
         return image

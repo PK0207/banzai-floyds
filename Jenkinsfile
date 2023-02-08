@@ -55,7 +55,7 @@ pipeline {
                         sh(script: "rm -f cleanup.txt", returnStatus: true)
                         echo output
                         sh('helm --namespace build upgrade --install banzai-floyds-e2e helm-chart/banzai-floyds-e2e ' +
-                            '--set image.tag="${GIT_DESCRIPTION}" --force --wait --timeout=3600')
+                            '--set image.tag="${GIT_DESCRIPTION}" --force --wait --timeout=3600s')
 
                         podName = sh(script: 'kubectl get po -l app.kubernetes.io/instance=banzai-floyds-e2e ' +
                                         '--sort-by=.status.startTime -o jsonpath="{.items[-1].metadata.name}"',

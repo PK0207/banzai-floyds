@@ -6,11 +6,12 @@ from astropy.io import fits
 from banzai_floyds.orders import Orders
 from banzai_floyds.utils.wavelength_utils import WavelengthSolution
 from banzai_floyds.frames import FLOYDSObservationFrame
-from banzai_floyds.extract import Extractor, fit_profile, fit_background, extract, get_wavelength_bins, bin_data
+from banzai_floyds.extract import Extractor, fit_profile, fit_profile_width, fit_background, extract
+from banzai_floyds.extract import get_wavelength_bins, bin_data
+from collections import namedtuple
 
 from banzai_floyds.utils.fitting_utils import gauss, fwhm_to_sigma
 from astropy.io import ascii
-import pytest
 
 import pkg_resources
 
@@ -106,6 +107,28 @@ def generate_fake_science_frame(include_background=False, flat_spectrum=True):
     return frame
 
 
+def test_wavelength_bins():
+    fakeWavelengths = namedtuple('fakeWavelengths', 'line_tilts bin_edges orders')
+    fakeOrders = namedtuple('fakeOrders', 'order_height') 
+    input_wavelengths = fakeWavelengths(line_tilts=np.array([0.0, 0.0]),
+                                        bin_edges=[np.arange(0.0, 100.5, step=1), np.arange(100.0, 200.5, step=1)],
+                                        orders=fakeOrders(order_height=0.0))
+    wavelength_bins = get_wavelength_bins(input_wavelengths)
+    for i, bins in enumerate(wavelength_bins):
+        expected = np.arange(0.5 + (i * 100.0), 100.0 * (i + 1), step=1)
+        np.testing.assert_allclose(bins['center'], expected)
+        np.testing.assert_allclose(bins['width'], 1.0)
+
+    input_wavelengths = fakeWavelengths(line_tilts=np.array([45.0, 45.0]),
+                                        bin_edges=[np.arange(0.0, 100.5, step=1), np.arange(100.0, 200.5, step=1)],
+                                        orders=fakeOrders(order_height=10.0 * np.sqrt(2.0)))
+    wavelength_bins = get_wavelength_bins(input_wavelengths)
+    for i, bins in enumerate(wavelength_bins):
+        expected = np.arange(0.5 + (i * 100.0), 100.0 * (i + 1), step=1)[5:-5]
+        np.testing.assert_allclose(bins['center'], expected)
+        np.testing.assert_allclose(bins['width'], 1.0)
+
+
 def test_tracing():
     np.random.seed(3656454)
     # Make a fake frame with a gaussian profile and make sure we recover the input
@@ -119,13 +142,27 @@ def test_tracing():
         np.testing.assert_allclose(fitted_center(x), input_center(x), rtol=0.00, atol=0.2)
 
 
+def test_profile_width_fitting():
+    np.random.seed(1242315)
+    fake_frame = generate_fake_science_frame(include_background=True)
+    wavelength_bins = get_wavelength_bins(fake_frame.wavelengths)
+    binned_data = bin_data(fake_frame.data, fake_frame.uncertainty, fake_frame.wavelengths,
+                           fake_frame.orders, wavelength_bins)
+    fitted_widths = fit_profile_width(binned_data, fake_frame.input_profile_centers)
+    for fitted_width, bins in zip(fitted_widths, wavelength_bins):
+        x = np.arange(bins['center'][0], bins['center'][-1] + 1)
+        np.testing.assert_allclose(fitted_width(x), fwhm_to_sigma(fake_frame.input_profile_width), rtol=0.03)
+
+
 def test_background_fitting():
     np.random.seed(9813245)
     fake_frame = generate_fake_science_frame(include_background=True)
     wavelength_bins = get_wavelength_bins(fake_frame.wavelengths)
     binned_data = bin_data(fake_frame.data, fake_frame.uncertainty, fake_frame.wavelengths,
                            fake_frame.orders, wavelength_bins)
-    fitted_background, _ = fit_background(binned_data, fake_frame.input_profile_centers)
+    fake_profile_width_funcs = [lambda _: fwhm_to_sigma(fake_frame.input_profile_width)
+                                for _ in fake_frame.input_profile_centers]
+    fitted_background = fit_background(binned_data, fake_frame.input_profile_centers, fake_profile_width_funcs)
     fake_frame.background = fitted_background
     binned_fitted_background = bin_data(fake_frame.data, fake_frame.uncertainty, fake_frame.wavelengths,
                                         fake_frame.orders, wavelength_bins)
@@ -151,7 +188,6 @@ def test_extraction():
     np.testing.assert_allclose(extracted['flux'] / extracted['fluxerror'], 100.0, rtol=0.10)
 
 
-@pytest.mark.skip(reason="There are 9 pixels in bright sky lines that are getting flagged as not matching")
 def test_full_extraction_stage():
     np.random.seed(192347)
     input_context = context.Context({})

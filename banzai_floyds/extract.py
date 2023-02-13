@@ -17,6 +17,11 @@ def background_fixed_profile_center(params, x, center):
     return gauss(x, center, sigma) + background(x)
 
 
+def background_fixed_profile(params, x, center, sigma):
+    background = Legendre(coef=params, domain=(np.min(x), np.max(x)))
+    return gauss(x, center, sigma) + background(x)
+
+
 def bins_to_bin_edges(bins):
     bin_edges = bins['center'] - (bins['width'] / 2.0)
     bin_edges = np.append(bin_edges, bins['center'][-1] + (bins['width'][-1] / 2.0))
@@ -76,53 +81,79 @@ def fit_profile(data, profile_width=4):
     return trace_centers
 
 
-def fit_background(data, profile_fits, poly_order=4, default_width=4):
+def fit_profile_width(data, profile_fits, poly_order=3, background_poly_order=2, default_width=4):
     # In principle, this should be some big 2d fit where we fit the profile center, the profile width,
     #   and the background in one go
     profile_width = {'wavelength': [], 'width': [], 'order': []}
-    background_fit = Table({'x': [], 'y': [], 'background': []})
     for data_to_fit in data.groups:
-        profile = profile_fits[data_to_fit['order'][0] - 1]
         wavelength_bin = data_to_fit['wavelength_bin'][0]
         order_id = data_to_fit['order'][0]
+        profile_center = profile_fits[order_id - 1](wavelength_bin)
+
+        # If the SNR of the peak of the profile is 2 > than the peak of the background, keep the profile width
+        peak = np.argmin(np.abs(profile_center - data_to_fit['y_order']))
+        peak_snr = data_to_fit['data'][peak] / data_to_fit['uncertainty'][peak]
+        median_snr = np.median(np.abs(data_to_fit['data'] / data_to_fit['uncertainty']))
+        # Short circuit if the trace is not significantly brighter than the background in this bin
+        if peak_snr < 2.0 * median_snr:
+            continue
+
+        # Pass a match filter (with correct s/n scaling) with a gaussian with a default width
+        initial_coeffs = np.zeros(background_poly_order + 1)
+        initial_coeffs[0] = np.median(data_to_fit['data']) / data_to_fit['data'][peak]
+
+        initial_guess = fwhm_to_sigma(default_width), *initial_coeffs
+        best_fit_sigma, *_ = maximize_match_filter(initial_guess, data_to_fit['data'],
+                                                   data_to_fit['uncertainty'],
+                                                   background_fixed_profile_center,
+                                                   data_to_fit['y_order'],
+                                                   args=(profile_center,))
+
+        profile_width['wavelength'].append(wavelength_bin)
+        profile_width['width'].append(best_fit_sigma)
+        profile_width['order'].append(order_id)
+    profile_width = Table(profile_width)
+    # save the polynomial for the profile
+    profile_widths = [Legendre.fit(order_data['wavelength'], order_data['width'], deg=poly_order)
+                      for order_data in profile_width.group_by('order').groups]
+    return profile_widths
+
+
+def fit_background(data, profile_centers, profile_widths, poly_order=4):
+    results = Table({'x': [], 'y': [], 'background': []})
+    background_fit = Table({'x': [], 'y': [], 'background': []})
+    for data_to_fit in data.groups:
+        wavelength_bin = data_to_fit['wavelength_bin'][0]
+        order_id = data_to_fit['order'][0]
+        profile_center = profile_centers[order_id - 1](wavelength_bin)
+        profile_width = profile_widths[order_id - 1](wavelength_bin)
+        peak = np.argmin(np.abs(profile_center - data_to_fit['y_order']))
 
         # Pass a match filter (with correct s/n scaling) with a gaussian with a default width
         initial_coeffs = np.zeros(poly_order + 1)
-        initial_coeffs[0] = np.median(data_to_fit['data']) / np.max(data_to_fit['data'])
-        # Normalize to the peak of the gaussian
-        initial_coeffs[0] /= np.sqrt(2.0 * np.pi) * fwhm_to_sigma(default_width)
-        initial_guess = fwhm_to_sigma(default_width), *initial_coeffs
-        best_fit_sigma, *best_fit_coeffs = maximize_match_filter(initial_guess, data_to_fit['data'],
-                                                                 data_to_fit['uncertainty'],
-                                                                 background_fixed_profile_center,
-                                                                 data_to_fit['y_order'],
-                                                                 args=(profile(wavelength_bin),))
-        # If the peak of the profile is 2 > than the peak of the background, keep the profile width
-        peak = np.argmin(np.abs(profile(wavelength_bin) - data_to_fit['y_order']))
-        peak_snr = data_to_fit['data'][peak] / data_to_fit['uncertainty'][peak]
-        median_snr = np.median(np.abs(data_to_fit['data'] / data_to_fit['uncertainty']))
-        if peak_snr > 2.0 * median_snr:
-            profile_width['wavelength'].append(wavelength_bin)
-            profile_width['width'].append(best_fit_sigma)
-            profile_width['order'].append(order_id)
+        initial_coeffs[0] = np.median(data_to_fit['data']) / data_to_fit['data'][peak]
+
+        best_fit_coeffs = maximize_match_filter(initial_coeffs, data_to_fit['data'],
+                                                data_to_fit['uncertainty'],
+                                                background_fixed_profile,
+                                                data_to_fit['y_order'],
+                                                args=(profile_center, profile_width))
         # The match filter is insensitive to the normalization, so we do a simply chi^2 fit for the normalization
         # minimize sum(d - norm * poly)^2 / sig^2)
         # norm = sum(d / sig^2) / sum(poly / sig^2)
         normalization = np.sum(data_to_fit['data'] / (data_to_fit['uncertainty'] ** 2.0))
-        best_fit_model = background_fixed_profile_center((best_fit_sigma, *best_fit_coeffs),
-                                                         data_to_fit['y_order'],
-                                                         profile(wavelength_bin))
+        best_fit_model = background_fixed_profile(best_fit_coeffs, data_to_fit['y_order'], 
+                                                  profile_center, profile_width)
         normalization /= np.sum(best_fit_model * data_to_fit['uncertainty'] ** -2.0)
         domain = (np.min(data_to_fit['y_order']), np.max(data_to_fit['y_order']))
         background_polynomial = Legendre(coef=np.array(best_fit_coeffs) * normalization, domain=domain)
         results = Table({'x': data_to_fit['x'],
                          'y': data_to_fit['y'],
                          'background': background_polynomial(data_to_fit['y_order'])})
+    
         background_fit = vstack([background_fit, results])
 
-    profile_widths = [Legendre.fit(order_data['wavelength'], order_data['width'], deg=5)
-                      for order_data in Table(profile_width).group_by('order').groups]
-    return background_fit, profile_widths
+    return background_fit
 
 
 def get_wavelength_bins(wavelengths):
@@ -132,11 +163,19 @@ def get_wavelength_bins(wavelengths):
     # TODO: in the long run we probably shouldn't bin at all and just do a full 2d sky fit
     #   (including all flux in the order, yikes)
     # Throw out the edge bins of the order as the lines are tilt and our orders are vertical
-    pixels_to_cut = (np.round(0.5 * np.sin(np.deg2rad(wavelengths.line_tilts)) * wavelengths.orders.order_height))
+    pixels_to_cut = (np.round(0.5 * np.sin(np.deg2rad(wavelengths.line_tilts)) * wavelengths.orders.order_height)).astype(int)
     bin_edges = wavelengths.bin_edges
-    return [Table({'center': (edges[1 + cut:] + edges[:-1 - cut]) / 2.0,
-                   'width': edges[1 + cut:] - edges[:-1 - cut]})
-            for edges, cut in zip(bin_edges, pixels_to_cut.astype(int))]
+    cuts = []
+    for cut in pixels_to_cut:
+        if cut == 0:
+            right_side_slice = slice(1, None)
+        else:
+            right_side_slice = slice(1+cut, -cut)
+        left_side_slice = slice(cut, -1-cut)
+        cuts.append((right_side_slice, left_side_slice))
+    return [Table({'center': (edges[right_cut] + edges[left_cut]) / 2.0,
+                   'width': edges[right_cut] - edges[left_cut]})
+            for edges, (right_cut, left_cut) in zip(bin_edges, cuts)]
 
 
 def extract(binned_data):
@@ -203,9 +242,11 @@ class Extractor(Stage):
         image.binned_data = bin_data(image.data, image.uncertainty, image.wavelengths,
                                      image.orders, image.wavelength_bins)
         profile_centers = fit_profile(image.binned_data)
-        background, profile_widths = fit_background(image.binned_data, profile_centers)
-        image.background = background
+        profile_widths = fit_profile_width(image.binned_data, profile_centers)
         image.profile = profile_centers, profile_widths
+
+        background = fit_background(image.binned_data, profile_centers, profile_widths)
+        image.background = background
         image.extracted = extract(image.binned_data)
 
         # TODO: Stitching together the orders is going to require flux calibration and probably

@@ -109,7 +109,7 @@ def generate_fake_science_frame(include_background=False, flat_spectrum=True):
 
 def test_wavelength_bins():
     fakeWavelengths = namedtuple('fakeWavelengths', 'line_tilts bin_edges orders')
-    fakeOrders = namedtuple('fakeOrders', 'order_height') 
+    fakeOrders = namedtuple('fakeOrders', 'order_height')
     input_wavelengths = fakeWavelengths(line_tilts=np.array([0.0, 0.0]),
                                         bin_edges=[np.arange(0.0, 100.5, step=1), np.arange(100.0, 200.5, step=1)],
                                         orders=fakeOrders(order_height=0.0))

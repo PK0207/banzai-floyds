@@ -3,7 +3,7 @@ import numpy as np
 from astropy.table import Table, vstack
 from banzai_floyds.matched_filter import maximize_match_filter
 from numpy.polynomial.legendre import Legendre
-from banzai_floyds.utils.fitting_utils import gauss, fwhm_to_sigma
+from banzai_floyds.utils.fitting_utils import gauss, fwhm_to_sigma, Legendre2d
 
 
 def profile_gauss_fixed_width(params, x, sigma):
@@ -17,9 +17,20 @@ def background_fixed_profile_center(params, x, center):
     return gauss(x, center, sigma) + background(x)
 
 
-def background_fixed_profile(params, x, center, sigma):
-    background = Legendre(coef=params, domain=(np.min(x), np.max(x)))
-    return gauss(x, center, sigma) + background(x)
+def background_fixed_profile(params, coords, center, sigma, x_deg):
+    x, y = coords
+    x_coeffs = params[:x_deg + 1]
+    y_coeffs = np.append([1.0], params[x_deg + 1:])
+    background = Legendre2d(x_coeffs, y_coeffs, domains=((np.min(x), np.max(x)), (np.min(y), np.max(y))))
+    return gauss(y, center, sigma) + background(x, y)
+
+
+def background_only(params, coords, x_deg):
+    x, y = coords
+    x_coeffs = params[:x_deg + 1]
+    y_coeffs = np.append([1.0], params[x_deg + 1:])
+    background = Legendre2d(x_coeffs, y_coeffs, domains=((np.min(x), np.max(x)), (np.min(y), np.max(y))))
+    return background(x, y)
 
 
 def bins_to_bin_edges(bins):
@@ -119,7 +130,7 @@ def fit_profile_width(data, profile_fits, poly_order=3, background_poly_order=2,
     return profile_widths
 
 
-def fit_background(data, profile_centers, profile_widths, poly_order=4):
+def fit_background(data, profile_centers, profile_widths, x_poly_order=2, y_poly_order=4):
     results = Table({'x': [], 'y': [], 'background': []})
     background_fit = Table({'x': [], 'y': [], 'background': []})
     for data_to_fit in data.groups:
@@ -130,29 +141,29 @@ def fit_background(data, profile_centers, profile_widths, poly_order=4):
         peak = np.argmin(np.abs(profile_center - data_to_fit['y_order']))
 
         # Pass a match filter (with correct s/n scaling) with a gaussian with a default width
-        initial_coeffs = np.zeros(poly_order + 1)
+        initial_coeffs = np.zeros((x_poly_order + 1) + y_poly_order)
         initial_coeffs[0] = np.median(data_to_fit['data']) / data_to_fit['data'][peak]
-
         best_fit_coeffs = maximize_match_filter(initial_coeffs, data_to_fit['data'],
                                                 data_to_fit['uncertainty'],
                                                 background_fixed_profile,
-                                                data_to_fit['y_order'],
-                                                args=(profile_center, profile_width))
+                                                (data_to_fit['wavelength'], data_to_fit['y_order']),
+                                                args=(profile_center, profile_width, x_poly_order))
         # The match filter is insensitive to the normalization, so we do a simply chi^2 fit for the normalization
         # minimize sum(d - norm * poly)^2 / sig^2)
         # norm = sum(d / sig^2) / sum(poly / sig^2)
         normalization = np.sum(data_to_fit['data'] / (data_to_fit['uncertainty'] ** 2.0))
-        best_fit_model = background_fixed_profile(best_fit_coeffs, data_to_fit['y_order'], 
-                                                  profile_center, profile_width)
+        best_fit_model = background_fixed_profile(best_fit_coeffs, (data_to_fit['wavelength'], data_to_fit['y_order']),
+                                                  profile_center, profile_width, x_poly_order)
         normalization /= np.sum(best_fit_model * data_to_fit['uncertainty'] ** -2.0)
-        domain = (np.min(data_to_fit['y_order']), np.max(data_to_fit['y_order']))
-        background_polynomial = Legendre(coef=np.array(best_fit_coeffs) * normalization, domain=domain)
+        normalized_coeffs = best_fit_coeffs.copy()
+        normalized_coeffs[:x_poly_order + 1] *= normalization
+        background = background_only(normalized_coeffs,
+                                     (data_to_fit['wavelength'], data_to_fit['y_order']),
+                                     x_poly_order)
         results = Table({'x': data_to_fit['x'],
                          'y': data_to_fit['y'],
-                         'background': background_polynomial(data_to_fit['y_order'])})
-    
+                         'background': background})
         background_fit = vstack([background_fit, results])
-
     return background_fit
 
 

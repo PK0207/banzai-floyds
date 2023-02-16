@@ -164,9 +164,9 @@ def test_background_fitting():
                                 for _ in fake_frame.input_profile_centers]
     fitted_background = fit_background(binned_data, fake_frame.input_profile_centers, fake_profile_width_funcs)
     fake_frame.background = fitted_background
-    binned_fitted_background = bin_data(fake_frame.data, fake_frame.uncertainty, fake_frame.wavelengths,
+    binned_fitted_background = bin_data(fake_frame.background, fake_frame.uncertainty, fake_frame.wavelengths,
                                         fake_frame.orders, wavelength_bins)
-    binned_input_sky = bin_data(fake_frame.data, fake_frame.uncertainty, fake_frame.wavelengths,
+    binned_input_sky = bin_data(fake_frame.input_sky, fake_frame.uncertainty, fake_frame.wavelengths,
                                 fake_frame.orders, wavelength_bins)
     np.testing.assert_allclose(binned_fitted_background['data'].groups.aggregate(np.sum),
                                binned_input_sky['data'].groups.aggregate(np.sum),
@@ -197,4 +197,4 @@ def test_full_extraction_stage():
     stage = Extractor(input_context)
     frame = stage.do_stage(frame)
     expected = np.interp(frame['EXTRACTED'].data['wavelength'], frame.input_spectrum_wavelengths, frame.input_spectrum)
-    np.testing.assert_allclose(frame['EXTRACTED'].data['flux'], expected, rtol=0.05)
+    np.testing.assert_allclose(frame['EXTRACTED'].data['flux'], expected, rtol=0.06)

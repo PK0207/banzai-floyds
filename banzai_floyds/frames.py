@@ -16,7 +16,7 @@ class FLOYDSObservationFrame(LCOObservationFrame):
         self.wavelengths = None
         self._profile_fits = None
         self._background_fits = None
-        self.wavelegnth_bins = None
+        self.wavelength_bins = None
         self.binned_data = None
         self._extracted = None
         LCOObservationFrame.__init__(self, hdu_list, file_path, frame_id=frame_id, hdu_order=hdu_order)

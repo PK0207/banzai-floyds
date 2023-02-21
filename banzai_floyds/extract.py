@@ -67,8 +67,6 @@ def bin_data(data, uncertainty, wavelengths, orders, wavelength_bins):
 
 
 def fit_profile(data, profile_width=4):
-    trace_centers = []
-    # for each order
     trace_points = Table({'wavelength': [], 'center': [], 'order': []})
     for data_to_fit in data.groups:
         # Pass a match filter (with correct s/n scaling) with a gaussian with a default width
@@ -132,7 +130,6 @@ def fit_profile_width(data, profile_fits, poly_order=3, background_poly_order=2,
 
 def fit_background(data, profile_centers, profile_widths, x_poly_order=2, y_poly_order=4):
     results = Table({'x': [], 'y': [], 'background': []})
-    background_fit = Table({'x': [], 'y': [], 'background': []})
     for data_to_fit in data.groups:
         wavelength_bin = data_to_fit['wavelength_bin'][0]
         order_id = data_to_fit['order'][0]
@@ -160,11 +157,11 @@ def fit_background(data, profile_centers, profile_widths, x_poly_order=2, y_poly
         background = background_only(normalized_coeffs,
                                      (data_to_fit['wavelength'], data_to_fit['y_order']),
                                      x_poly_order)
-        results = Table({'x': data_to_fit['x'],
-                         'y': data_to_fit['y'],
-                         'background': background})
-        background_fit = vstack([background_fit, results])
-    return background_fit
+        background_fit = Table({'x': data_to_fit['x'],
+                                'y': data_to_fit['y'],
+                                'background': background})
+        results = vstack([background_fit, results])
+    return results
 
 
 def get_wavelength_bins(wavelengths):

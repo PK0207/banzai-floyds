@@ -3,8 +3,8 @@ from astroscrappy import detect_cosmics
 
 
 class CosmicRayMasker(Stage):
-    def do_stage(image):
-        for order in image.orders:
+    def do_stage(self, image):
+        for order in image.orders.order_ids:
             in_order = order.data == order.value
             mask = detect_cosmics(image.data[in_order], inmask=image.mask[in_order],
                                   invar=image.uncertainty[in_order] ** 2,

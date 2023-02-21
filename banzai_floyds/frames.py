@@ -44,7 +44,7 @@ class FLOYDSObservationFrame(LCOObservationFrame):
         if self.obstype != 'SPECTRUM':
             return super().get_output_data_products(runtime_context)
         else:
-            return self.get_1d_and_2d_spectra_products()
+            return self.get_1d_and_2d_spectra_products(runtime_context)
 
     @property
     def profile(self):

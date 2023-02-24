@@ -331,4 +331,5 @@ class CalibrateWavelengths(Stage):
         image.wavelengths = WavelengthSolution(best_fit_polynomials, best_fit_widths, best_fit_tilts, image.orders)
         image.add_or_update(ArrayData(image.wavelengths.data, name='WAVELENGTHS',
                                       meta=image.wavelengths.to_header()))
+        image.is_master = True
         return image

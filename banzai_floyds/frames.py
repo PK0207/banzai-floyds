@@ -135,5 +135,5 @@ class FLOYDSFrameFactory(LCOFrameFactory):
                       for coeff_set, domain in zip(coeffs, domains)]
             image.orders = Orders(models, image.data.shape, image['ORDER_COEFFS'].meta['HEIGHT'])
         if 'WAVELENGTHS' in image:
-            image.wavelengths = WavelengthSolution.from_header(image['WAVELENGTHS'].meta)
+            image.wavelengths = WavelengthSolution.from_header(image['WAVELENGTHS'].meta, image.orders)
         return image

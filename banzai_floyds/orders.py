@@ -382,6 +382,7 @@ class OrderLoader(CalibrationUser):
 
     def apply_master_calibration(self, image, master_calibration_image):
         image.orders = master_calibration_image.orders
+        image.add_or_update(master_calibration_image['ORDER_COEFFS'])
         return image
 
 
@@ -395,7 +396,7 @@ class OrderSolver(Stage):
     ORDER_HEIGHT = 93
     CENTER_CUT_WIDTH = 31
     POLYNOMIAL_ORDER = 3
-    ORDER_REGIONS = [(0, 1700), (475, 1975)]
+    ORDER_REGIONS = [(0, 1700), (630, 1975)]
 
     def do_stage(self, image):
         if image.orders is None:

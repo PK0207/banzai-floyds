@@ -117,7 +117,7 @@ class TestWavelengthSolutionCreation:
         with Connection(os.getenv('FITS_BROKER')) as conn:
             producer = conn.Producer(exchange=exchange)
             for row in test_data:
-                if 'a00.fits' in test_data['filename']:
+                if 'a00.fits' in row['filename']:
                     archive_record = requests.get(f'{os.getenv("API_ROOT")}frames/{row["frameid"]}').json()
                     archive_record['frameid'] = archive_record['id']
                     producer.publish(archive_record)

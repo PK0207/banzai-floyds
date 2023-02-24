@@ -47,18 +47,18 @@ class WavelengthSolution:
         return self._line_tilts
 
     @classmethod
-    def from_header(cls, header):
-        orders = np.arange(1, len([x for x in header.keys() if 'POLYORD' in x]) + 1)
+    def from_header(cls, header, orders):
+        order_ids = np.arange(1, len([x for x in header.keys() if 'POLYORD' in x]) + 1)
         line_widths = []
         line_tilts = []
         polynomials = []
-        for order in orders:
-            line_tilts.append(header[f'LINTILT{order}'])
-            line_widths.append(header[f'LINWIDE{order}'])
-            polynomials.append(Legendre((float(header[f'COEF{order}_{i}'])
-                                         for i in range(int(header[f'POLYORD{order}']) + 1)),
-                               domain=eval(header[f'POLYDOM{order}'])))
-        return cls(polynomials, line_widths, line_tilts)
+        for order_id in order_ids:
+            line_tilts.append(header[f'LINTILT{order_id}'])
+            line_widths.append(header[f'LINWIDE{order_id}'])
+            polynomials.append(Legendre((float(header[f'COEF{order_id}_{i}'])
+                                         for i in range(int(header[f'POLYORD{order_id}']) + 1)),
+                               domain=eval(header[f'POLYDOM{order_id}'])))
+        return cls(polynomials, line_widths, line_tilts, orders)
 
     @property
     def orders(self):

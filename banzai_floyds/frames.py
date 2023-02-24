@@ -23,7 +23,7 @@ class FLOYDSObservationFrame(LCOObservationFrame):
 
     def get_1d_and_2d_spectra_products(self, runtime_context):
         filename_1d = self.get_output_filename(runtime_context).replace('.fits', '-1d.fits')
-        frame_1d = LCOObservationFrame([HeaderOnly(self.meta.copy()), self['SPECTRUM1D']],
+        frame_1d = LCOObservationFrame([HeaderOnly(self.meta.copy()), self['EXTRACTED']],
                                        os.path.join(self.get_output_directory(runtime_context), filename_1d))
         fits_1d = frame_1d.to_fits(runtime_context)
         fits_1d['SPECTRUM1D'].name = 'SPECTRUM'
@@ -33,7 +33,7 @@ class FLOYDSObservationFrame(LCOObservationFrame):
         output_product_1d = DataProduct.from_fits(fits_1d, filename_1d, self.get_output_directory(runtime_context))
 
         # TODO consider saving the background coeffs or the profile coeffs?
-        frame_2d = LCOObservationFrame([hdu for hdu in self._hdus if hdu.name not in ['SPECTRUM1D', 'CCF']],
+        frame_2d = LCOObservationFrame([hdu for hdu in self._hdus if hdu.name not in ['EXTRACTED']],
                                        os.path.join(self.get_output_directory(runtime_context), filename_2d))
         fits_2d = frame_2d.to_fits(runtime_context)
         fits_2d[0].header['L1ID1D'] = filename_1d

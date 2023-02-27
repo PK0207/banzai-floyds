@@ -55,8 +55,8 @@ class WavelengthSolution:
         for order_id in order_ids:
             line_tilts.append(header[f'LINTILT{order_id}'])
             line_widths.append(header[f'LINWIDE{order_id}'])
-            polynomials.append(Legendre((float(header[f'COEF{order_id}_{i}'])
-                                         for i in range(int(header[f'POLYORD{order_id}']) + 1)),
+            polynomials.append(Legendre([float(header[f'COEF{order_id}_{i}'])
+                                         for i in range(int(header[f'POLYORD{order_id}']) + 1)],
                                domain=eval(header[f'POLYDOM{order_id}'])))
         return cls(polynomials, line_widths, line_tilts, orders)
 

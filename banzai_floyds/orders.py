@@ -301,6 +301,9 @@ def fit_order_curve(data, error, order_height, initial_guess):
     -------
     Polynomial model function of the best fit
     """
+
+    # For this to work efficiently, you probably need a good initial guess. If we have that, we should define 
+    # a window of pixels around the initial guess to do the fit to optimize fitting a bunch of zeros
     x = np.meshgrid(np.arange(data.shape[1]), np.arange(data.shape[0]))
     best_fit_params = maximize_match_filter(initial_guess, data, error, smooth_order_weights, x,
                                             weights_jacobian_function=smooth_order_jacobian,
@@ -448,29 +451,3 @@ class OrderSolver(Stage):
         image.is_master = True
 
         return image
-
-
-# TODO: Add Get Trace Region
-def extract_order_center(orders, order_num, trace_width=1):
-    """
-    Extract mask of region around order center
-    :param orders: orders object containing data, domains, and _models for fit orders
-    :param order_num: int: the order to extract center from
-    :param trace_width: int: the thickness of the trace mask
-    :return:
-    center_mask: array: Mask of values around order center.
-    """
-    domain_range = np.arange(orders.domains[order_num][0], orders.domains[order_num][1])
-    centers = orders._models[order_num](domain_range)
-    center_mask = np.full(orders.data.shape, False)
-
-    over_pixels = np.arange(0, trace_width // 2 + 1)
-    pixel_height = np.dstack((over_pixels, -1 * over_pixels)).flatten()[1:trace_width+1]
-
-    for offset in pixel_height:
-        y_coords = np.int_(np.rint(centers + offset))
-        x_coords = np.int_(domain_range)
-        y_cut = np.where((0 < y_coords) & (y_coords < center_mask.shape[0]))
-        center_coords = (y_coords[y_cut], x_coords[y_cut])
-        center_mask[center_coords] = True
-    return center_mask

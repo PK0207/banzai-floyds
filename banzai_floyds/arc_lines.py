@@ -39,6 +39,7 @@ unused_lines = [{'wavelength': 3451.689, 'line_strength': 'nan', 'line_source': 
                 {'wavelength': 4347.5, 'line_strength': 'nan', 'line_source': 'Hg', 'line_notes': 'Weak line'},
                 {'wavelength': 4916.068, 'line_strength': 'nan', 'line_source': 'Hg', 'line_notes': 'Weak line'},
                 {'wavelength': 5790.67, 'line_strength': 'nan', 'line_source': 'Hg', 'line_notes': 'Blend?'},
+                {'wavelength': 5803.782, 'line_strength': 'nan', 'line_source': 'Hg', 'line_notes': 'Blend?'},
                 {'wavelength': 6416.307, 'line_strength': 'nan', 'line_source': 'ArI', 'line_notes': ''},
                 {'wavelength': 5675.81, 'line_strength': 'nan', 'line_source': 'Hg', 'line_notes': 'Weak'},
                 {'wavelength': 4680.1359, 'line_strength': 'nan', 'line_source': 'Zn',

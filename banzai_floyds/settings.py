@@ -12,8 +12,8 @@ FRAME_SELECTION_CRITERIA = [('type', 'contains', 'FLOYDS')]
 
 SUPPORTED_FRAME_TYPES = ['SPECTRUM', 'LAMPFLAT', 'ARC', 'SKYFLAT']
 
-LAST_STAGE = {'SPECTRUM': None, 
-              'LAMPFLAT': 'banzai_floyds.wavelengths.WavelengthSolutionLoader', 
+LAST_STAGE = {'SPECTRUM': None,
+              'LAMPFLAT': 'banzai_floyds.wavelengths.WavelengthSolutionLoader',
               'ARC': 'banzai_floyds.orders.OrderLoader',
               'SKYFLAT': 'banzai_floyds.orders.OrderLoader'}
 

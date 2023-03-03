@@ -302,7 +302,7 @@ def fit_order_curve(data, error, order_height, initial_guess):
     Polynomial model function of the best fit
     """
 
-    # For this to work efficiently, you probably need a good initial guess. If we have that, we should define 
+    # For this to work efficiently, you probably need a good initial guess. If we have that, we should define
     # a window of pixels around the initial guess to do the fit to optimize fitting a bunch of zeros
     x = np.meshgrid(np.arange(data.shape[1]), np.arange(data.shape[0]))
     best_fit_params = maximize_match_filter(initial_guess, data, error, smooth_order_weights, x,

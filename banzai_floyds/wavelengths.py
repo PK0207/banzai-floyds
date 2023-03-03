@@ -276,7 +276,7 @@ class CalibrateWavelengths(Stage):
             flux_1d = np.median(image.data[order_region], axis=0)
             # This 1.2533 is from Rider 1960 DOI: 10.1080/01621459.1960.10482056 and converts the standard error
             # to error on the median
-            flux_1d_error = 1.2533 * np.median(image.uncertainty[order_region], axis=0) 
+            flux_1d_error = 1.2533 * np.median(image.uncertainty[order_region], axis=0)
             flux_1d_error /= np.sqrt(extraction_orders._order_height)
             linear_solution = linear_wavelength_solution(flux_1d, flux_1d_error, self.LINES[self.LINES['used']],
                                                          self.INITIAL_DISPERSIONS[order],

@@ -61,7 +61,8 @@ def test_identify_peaks():
     line_sep = 10
     input_spectrum, lines, test_lines = build_random_spectrum(seed=seed, line_sigma=line_width, nlines=6)
 
-    recovered_peaks = identify_peaks(input_spectrum, 0.01 * np.ones_like(input_spectrum), sigma_to_fwhm(line_width), line_sep)
+    recovered_peaks = identify_peaks(input_spectrum, 0.01 * np.ones_like(input_spectrum),
+                                     sigma_to_fwhm(line_width), line_sep)
 
     # Need to figure out how to handle blurred lines and combined peaks
     for peak in recovered_peaks:
@@ -109,10 +110,10 @@ def test_refine_peak_centers():
     line_sep = 10
     input_spectrum, lines, test_lines = build_random_spectrum(seed=seed, line_sigma=line_width)
 
-    recovered_peaks = identify_peaks(input_spectrum, 0.01 * np.ones_like(input_spectrum), 
+    recovered_peaks = identify_peaks(input_spectrum, 0.01 * np.ones_like(input_spectrum),
                                      sigma_to_fwhm(line_width), line_sep)
 
-    fit_list = refine_peak_centers(input_spectrum, 0.01 * np.ones_like(input_spectrum), 
+    fit_list = refine_peak_centers(input_spectrum, 0.01 * np.ones_like(input_spectrum),
                                    recovered_peaks, sigma_to_fwhm(line_width))
 
     # Need to figure out how to handle blurred lines and overlapping peaks.

@@ -1,6 +1,4 @@
 from banzai_floyds.orders import estimate_order_centers, order_region, fit_order_curve, OrderSolver, trace_order
-from banzai_floyds.orders import smooth_order_weights, smooth_order_jacobian, smooth_order_hessian
-from banzai_floyds.matched_filter import matched_filter_metric
 import numpy as np
 from numpy.polynomial.legendre import Legendre
 from banzai.tests.utils import FakeContext

@@ -34,9 +34,10 @@ def test_fit_orders():
                                       data.shape)
     data[input_order_region] = 1000.0
     error[input_order_region] = 100.0
-
+    x2d, y2d = np.meshgrid(np.arange(data.shape[1]), np.arange(data.shape[0]))
     # Give an initial guess of the center, but zero curvature to make sure we converge
-    fitted_order_model = fit_order_curve(data, error, order_height, [order_center, 5, 15])
+    fitted_order_model = fit_order_curve(data, error, order_height, [order_center, 5, 15],
+                                         (x2d, y2d), (np.min(x2d), np.max(x2d)))
     fitted_order_region = order_region(order_height, fitted_order_model, data.shape)
     assert (input_order_region != fitted_order_region).sum() < 150
 
@@ -81,9 +82,9 @@ def test_order_tracing():
     data += np.random.normal(0.0, scale=read_noise, size=data.shape)
     input_order_regions = [order_region(order_height, Legendre(params, domain=(0, data.shape[1] - 1)),
                                         data.shape) for params in input_center_params]
-
+    data += np.random.poisson(30.0, size=data.shape)
     for region in input_order_regions:
-        data[region] += np.random.poisson(500.0, size=data.shape)[region]
+        data[region] += np.random.poisson(1500.0, size=data.shape)[region]
     error = np.sqrt(read_noise ** 2.0 + np.abs(data))
 
     center_section = slice(None), slice(data.shape[1] // 2 - center_width // 2,

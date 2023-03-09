@@ -137,102 +137,6 @@ def smooth_order_weights(params, x, height, k=2):
     return weights
 
 
-# This code is now deprecated as the performance is just too slow given that the numerical derivatives work fine.
-# The original goal of this was to get better convergence from a flat trace, but it wasn't enough of a boost.
-# We should probably let the order height vary as a parameter well and add a free parameter for the background
-# level.
-def smooth_order_jacobian(theta, x, i, height, k=2):
-    """
-    Calculate the ith partial derivatives of the smooth top-hat weights
-
-    Parameters
-    ----------
-    theta: array of floats
-        Coefficients of the Legendre polynomial that describes the center of the order
-    x: tuple of arrays independent variables x, y
-        Arrays should be the same shape as the input data
-    i: int
-        index of the coefficient to take a partial derivative with respect to
-    height: int
-        Number of pixels in the top of the hat
-    k: float
-        Sharpness parameter of the edges of the top-hat
-
-    Returns
-    -------
-    array of ith partial derivative of the smooth top-hat weights, same shape as the input data
-
-    Notes
-    -----
-    h = half_height
-    Note we have used the Einstein summation notation
-    weights = w = σ(y - cᵢ Pᵢ(x) + h) σ(-y + cᵢ Pᵢ(x) + h)
-    use σ' = σ (1 - σ)
-    Note the minus signs come from when the polynomials are added or subtracted
-    ∂ⱼw = -k Pⱼ(x) σ(y - cᵢ Pᵢ(x) + h) (1 - σ(y - cᵢ Pᵢ(x) + h)) σ(-y + cᵢ Pᵢ(x) + h) + \
-          + k Pⱼ(x) σ(y - cᵢ Pᵢ(x) + h) σ(-y + cᵢ Pᵢ(x) + h) (1 - σ(-y + cᵢ Pᵢ(x) + h))
-    ∂ⱼw = k Pⱼ(x) σ(y - cᵢ Pᵢ(x) + h) σ(-y + cᵢ Pᵢ(x) + h) (σ(y - cᵢ Pᵢ(x) + h) - σ(-y + cᵢ Pᵢ(x) + h))
-    """
-    x2d, y2d = x
-    model = Legendre(theta, domain=(np.min(x2d), np.max(x2d)))
-
-    half_height = height // 2 + 0.5
-    y_centers = model(x2d)
-    polynomial_i = model.basis(i, domain=(np.min(x2d), np.max(x2d)))(x2d)
-    sigma_plus = expit(k * (y2d - y_centers + half_height))
-    sigma_minus = expit(k * (-y2d + y_centers + half_height))
-    return k * polynomial_i * sigma_minus * sigma_plus * (sigma_plus -
-                                                          sigma_minus)
-
-
-# This code is now deprecated as the performance is just too slow given that the numerical derivatives work fine.
-# The original goal of this was to get better convergence from a flat trace, but it wasn't enough of a boost.
-# We should probably let the order height vary as a parameter well and add a free parameter for the background
-# level.
-def smooth_order_hessian(theta, x, i, j, height, k=2):
-    """
-    Calculate i,j component of the Hessian matrix of second derivatives of the smooth top-hat weights
-
-    Parameters
-    ----------
-    theta: array of floats
-        Coefficients of the Legendre polynomial that describes the center of the order
-    x: tuple of arrays independent variables x, y.
-        Arrays should be the same shape as the input data
-    i: int
-        Index of the coefficient to take the first partial derivative with respect to
-    j: int
-        Index of the coefficient to take the second partial derivative with respect to
-    height: int
-        Number of pixels in the top of the hat
-    k: float
-        Sharpness parameter of the edges of the top-hat
-
-    Returns
-    -------
-    array of i, j second partial derivative of the smooth top-hat weights, same shape as the input data
-
-    Notes
-    ------
-    σ+ = (y - cᵢ Pᵢ(x) + h)
-    σ- = σ(-y + cᵢ Pᵢ(x) + h)
-    ∂ᵢ∂ⱼw = k² Pᵢ Pⱼ (σ+ σ- (1 - σ-) (σ+ - σ-) - σ- σ+ (1 - σ+) (σ+ - σ-) - σ- σ+ (σ- (1 - σ-) + σ+ (1 - σ+)))
-    ∂ᵢ∂ⱼw = k² Pᵢ Pⱼ σ+ σ- ((σ+ - σ-)² +  σ+ (σ+ - 1) + σ- (σ- - 1))
-    """
-
-    x2d, y2d = x
-    model = Legendre(theta, domain=(np.min(x2d), np.max(x2d)))
-    half_height = height // 2 + 0.5
-    y_centers = model(x2d)
-    sigma_plus = expit(k * (y2d - y_centers + half_height))
-    sigma_minus = expit(k * (-y2d + y_centers + half_height))
-    polynomial_i = model.basis(i, domain=(np.min(x2d), np.max(x2d)))(x2d)
-    polynomial_j = model.basis(j, domain=(np.min(x2d), np.max(x2d)))(x2d)
-    hessian = (sigma_plus - sigma_minus) * (sigma_plus - sigma_minus)
-    hessian += sigma_plus * (sigma_plus - 1) + sigma_minus * (sigma_minus - 1)
-    return k * k * polynomial_j * polynomial_i * sigma_plus * sigma_minus * hessian
-
-
 def order_region(order_height, center, image_size):
     """
     Get an order mask to get the pixels inside the order
@@ -326,15 +230,8 @@ def fit_order_curve(data, error, order_height, initial_guess):
     # For this to work efficiently, you probably need a good initial guess. If we have that, we should define
     # a window of pixels around the initial guess to do the fit to optimize fitting a bunch of zeros
     x = np.meshgrid(np.arange(data.shape[1]), np.arange(data.shape[0]))
-    best_fit_params = maximize_match_filter(
-        initial_guess,
-        data,
-        error,
-        smooth_order_weights,
-        x,
-        # weights_jacobian_function=smooth_order_jacobian,
-        # weights_hessian_function=smooth_order_hessian,
-        args=(order_height, ))
+    best_fit_params = maximize_match_filter(initial_guess, data, error, smooth_order_weights,
+                                            x, args=(order_height, ))
     return Legendre(best_fit_params, domain=(0, data.shape[1] - 1))
 
 

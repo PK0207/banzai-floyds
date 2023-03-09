@@ -266,10 +266,10 @@ class CalibrateWavelengths(Stage):
         orders = np.unique(image.orders.data)
         orders = orders[orders != 0]
         initial_wavelength_solutions = []
+        # copy order centers and get mask for height of a few extract median along axis=0
+        extraction_orders = copy(image.orders)
+        extraction_orders.order_heights = self.EXTRACTION_HEIGHT * np.ones_like(orders)
         for order in orders:
-            # copy order centers and get mask for height of a few extract median along axis=0
-            extraction_orders = copy(image.orders)
-            extraction_orders._order_height = self.EXTRACTION_HEIGHT
             order_region = get_order_2d_region(extraction_orders.data == order)
             # Note that his flux has an x origin at the x = 0 instead of the domain of the order
             # I don't think it matters though
@@ -277,7 +277,7 @@ class CalibrateWavelengths(Stage):
             # This 1.2533 is from Rider 1960 DOI: 10.1080/01621459.1960.10482056 and converts the standard error
             # to error on the median
             flux_1d_error = 1.2533 * np.median(image.uncertainty[order_region], axis=0)
-            flux_1d_error /= np.sqrt(extraction_orders._order_height)
+            flux_1d_error /= np.sqrt(self.EXTRACTION_HEIGHT)
             linear_solution = linear_wavelength_solution(flux_1d, flux_1d_error, self.LINES[self.LINES['used']],
                                                          self.INITIAL_DISPERSIONS[order],
                                                          self.INITIAL_LINE_WIDTHS[order],

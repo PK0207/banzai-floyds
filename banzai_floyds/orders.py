@@ -141,6 +141,17 @@ def smooth_order_weights(params, x, height, domain, k=2):
     return weights
 
 
+def order_tweak_weights(params, X, coeffs, height, domain, k=2):
+    x_shift, y_shift, rotation = params
+    x, y = X
+    rotation = np.deg2rad(rotation)
+    new_x = np.cos(rotation) * x - np.sin(rotation) * y
+    new_y = np.sin(rotation) * x + np.cos(rotation) * y
+    new_x -= x_shift
+    new_y -= y_shift
+    return smooth_order_weights(coeffs, (new_x, new_y), height, domain, k=k)
+
+
 def order_region(order_height, center, image_size):
     """
     Get an order mask to get the pixels inside the order
@@ -204,34 +215,6 @@ def estimate_order_centers(data, error, order_height, peak_separation=10, min_si
     peaks = np.logical_and(peaks, matched_filtered > min_signal_to_noise)
     # Why we have to use flatnonzero here instead of argwhere behaving the way I want is a mystery
     return np.flatnonzero(peaks)
-
-
-def fit_order_curve(data, error, order_height, initial_coeffs, x, domain):
-    """
-    Maximize the matched filter metric to find the best fit order curvature and location
-
-    Parameters
-    ----------
-    data: array to fit order
-    error: array of uncertainties
-        Same shapes as the input data array
-    order_height: int
-        Number of pixels in the top of the hat
-    initial_guess: array
-        Initial guesses for the Legendre polynomial coefficients of the center of the order
-
-    Returns
-    -------
-    Polynomial model function of the best fit
-    """
-
-    # For this to work efficiently, you probably need a good initial guess. If we have that, we should define
-    # a window of pixels around the initial guess to do the fit to optimize not fitting a bunch of zeros
-    initial_guess = [*initial_coeffs, order_height]
-    best_fit_coeffs = maximize_match_filter(initial_guess, data, error,
-                                            smooth_order_weights, x,
-                                            args=(order_height, domain,))
-    return Legendre(best_fit_coeffs, domain=domain)
 
 
 def trace_order(data, error, order_height, initial_center, initial_center_x,
@@ -298,6 +281,55 @@ def trace_order(data, error, order_height, initial_center, initial_center_x,
     return np.array(xs), np.array(centers)
 
 
+def fit_order_curve(data, error, order_height, initial_coeffs, x, domain):
+    """
+    Maximize the matched filter metric to find the best fit order curvature and location
+
+    Parameters
+    ----------
+    data: array to fit order
+    error: array of uncertainties
+        Same shapes as the input data array
+    order_height: int
+        Number of pixels in the top of the hat
+    initial_guess: array
+        Initial guesses for the Legendre polynomial coefficients of the center of the order
+
+    Returns
+    -------
+    Polynomial model function of the best fit
+    """
+
+    # For this to work efficiently, you probably need a good initial guess. If we have that, we should define
+    # a window of pixels around the initial guess to do the fit to optimize not fitting a bunch of zeros
+    best_fit_coeffs = maximize_match_filter(initial_coeffs, data, error, smooth_order_weights,
+                                            x, args=(order_height, domain,))
+    return Legendre(best_fit_coeffs, domain=domain)
+
+
+def fit_order_tweak(data, error, order_height, coeffs, x, domain):
+    """
+    Maximize the matched filter metric to find the best fit order curvature and location
+
+    Parameters
+    ----------
+    data: array to fit order
+    error: array of uncertainties
+        Same shapes as the input data array
+    order_height: float
+    Returns
+    -------
+    x_shift, y_shift, rotation
+    """
+
+    # For this to work efficiently, you probably need a good initial guess. If we have that, we should define
+    # a window of pixels around the initial guess to do the fit to optimize not fitting a bunch of zeros
+    best_fit_offsets = maximize_match_filter([0.0, 0.0, 0.0], data, error,
+                                             order_tweak_weights, x,
+                                             args=(coeffs, order_height, domain,))
+    return best_fit_offsets
+
+
 class OrderLoader(CalibrationUser):
     """
     A stage to load previous order fits from sky flats
@@ -316,6 +348,25 @@ class OrderLoader(CalibrationUser):
     def apply_master_calibration(self, image, master_calibration_image):
         image.orders = master_calibration_image.orders
         image.add_or_update(master_calibration_image['ORDER_COEFFS'])
+        return image
+
+
+class OrderTweaker(Stage):
+    def do_stage(self, image):
+        # Only fit the red order for now
+        order_height = image.orders.order_heights[0]
+        domain = image.orders.domains[1]
+        coeffs = image.orders.coeffs[1]
+        x2d, y2d = np.meshgrid(np.arange(image.shape[1]), np.arange(image.shape[0]))
+        region = np.logical_and(x2d <= domain[1], x2d >= domain[0])
+        center_model = Legendre(coeffs, domain=domain)
+        # Only keep pixels +- half the height above the initial guess
+        region = np.logical_and(region, np.abs(y2d - center_model(x2d)) <= (order_height / 2.0))
+        x_shift, y_shift, rotation = fit_order_tweak(image.data[region], image.uncertainty[region], 
+                                                     order_height, coeffs, (x2d[region], y2d[region]), domain)
+        image.meta['ORDXSHFT'] = x_shift
+        image.meta['ORDYSHFT'] = y_shift
+        image.meta['ORDROT'] = rotation
         return image
 
 

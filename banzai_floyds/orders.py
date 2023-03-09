@@ -137,6 +137,10 @@ def smooth_order_weights(params, x, height, k=2):
     return weights
 
 
+# This code is now deprecated as the performance is just too slow given that the numerical derivatives work fine.
+# The original goal of this was to get better convergence from a flat trace, but it wasn't enough of a boost.
+# We should probably let the order height vary as a parameter well and add a free parameter for the background
+# level.
 def smooth_order_jacobian(theta, x, i, height, k=2):
     """
     Calculate the ith partial derivatives of the smooth top-hat weights
@@ -181,6 +185,10 @@ def smooth_order_jacobian(theta, x, i, height, k=2):
                                                           sigma_minus)
 
 
+# This code is now deprecated as the performance is just too slow given that the numerical derivatives work fine.
+# The original goal of this was to get better convergence from a flat trace, but it wasn't enough of a boost.
+# We should probably let the order height vary as a parameter well and add a free parameter for the background
+# level.
 def smooth_order_hessian(theta, x, i, j, height, k=2):
     """
     Calculate i,j component of the Hessian matrix of second derivatives of the smooth top-hat weights

@@ -24,7 +24,9 @@ class Orders:
         """
         self._models = models
         self._image_shape = image_shape
-        self._order_heights = np.array(order_heights)
+        dummy_heights = np.ones(len(self._models))
+        dummy_heights *= order_heights
+        self._order_heights = dummy_heights
 
     @property
     def data(self):
@@ -348,6 +350,7 @@ class OrderLoader(CalibrationUser):
     def apply_master_calibration(self, image, master_calibration_image):
         image.orders = master_calibration_image.orders
         image.add_or_update(master_calibration_image['ORDER_COEFFS'])
+        print(image.orders.coeffs, image.orders.order_heights, image.orders.domains)
         return image
 
 
@@ -407,10 +410,12 @@ class OrderSolver(Stage):
                                                      self.ORDER_REGIONS[i][1]))
                 order_estimates.append((initial_model.coef, self.ORDER_HEIGHT, initial_model.domain))
         else:
+            print('Using previous estimate')
             # Load from previous solve
             order_estimates = [(coeff, height, domain)
                                for coeff, height, domain in
-                               zip(image.orders.coeffs, image.orders.height, image.orders.domains)]
+                               zip(image.orders.coeffs, image.orders.order_heights, list(image.orders.domains.values()))]
+            print(len(order_estimates))
         # Do a fit to get the curvature of the slit
         order_curves = []
         for i, (coeff, height, domain) in enumerate(order_estimates):
@@ -427,6 +432,7 @@ class OrderSolver(Stage):
         image.add_or_update(ArrayData(image.orders.data, name='ORDERS'))
         coeff_table = [{f'c{i}': coeff for i, coeff in enumerate(image.orders.coeffs[order])}
                        for order in image.orders.coeffs]
+        print(coeff_table)
         for i, row in enumerate(coeff_table):
             row['order'] = i + 1
             row['domainmin'], row['domainmax'] = image.orders.domains[i + 1]
@@ -436,12 +442,12 @@ class OrderSolver(Stage):
         coeff_table['domainmin'].description = 'Domain minimum for the order curve'
         coeff_table['domainmax'].description = 'Domain maximum for the order curve'
         coeff_table['height'].description = 'Order height'
-        for i in range(self.POLYNOMIAL_ORDER + 1):
-            coeff_table[f'c{i}'].description = f'Coefficient for P_{i}'
+        # for i in range(self.POLYNOMIAL_ORDER + 1):
+        #     coeff_table[f'c{i}'].description = f'Coefficient for P_{i}'
 
         image.add_or_update(
             DataTable(coeff_table, name='ORDER_COEFFS',
-                      meta=fits.Header({'POLYORD': self.POLYNOMIAL_ORDER}))
+                      meta=fits.Header({'POLYORD': self.POLYNOMIAL_ORDER, 'HEIGHT': self.ORDER_HEIGHT}))
         )
         image.is_master = True
 
